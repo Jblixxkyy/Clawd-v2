@@ -51,9 +51,8 @@ def _bash_missing_result(command: str, cwd: Path) -> ToolResult:
                 "requires bash and runs bash syntax only -- it is never "
                 "translated to another shell. On Windows, install Git Bash "
                 "(https://git-scm.com/downloads) and restart, or see "
-                "docs/guide/SETUP_GUIDE.md. If the PowerShell tool is enabled "
-                '("enable_powershell": true in ~/.clawd/config.json), use it '
-                "with PowerShell syntax instead."
+                "docs/guide/SETUP_GUIDE.md. The PowerShell tool is enabled by "
+                "default on Windows -- use it with PowerShell syntax instead."
             ),
             "started": False,
         },
