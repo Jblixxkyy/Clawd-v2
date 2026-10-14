@@ -637,10 +637,7 @@ class ClawdREPL:
             self._show_slash_palette(query or None)
             return
         if selected:
-            # collect_palette_items embeds aliases as "/name (aliases: ...)"
-            # – strip to the invocable name before dispatch.
-            invocable = selected.split(" (aliases:", 1)[0].strip()
-            self.handle_command(invocable)
+            self.handle_command(selected)
 
     def _show_slash_palette(self, query: str | None = None) -> None:
         q = (query or "").strip().lower()
@@ -850,26 +847,10 @@ class ClawdREPL:
             self._open_command_center()
             return
         if raw.startswith("/") and " " not in raw and raw.lower() not in (c.lower() for c in self._built_in_commands):
-            # "_built_in_commands" does NOT contain skills – without this guard
-            # selecting "/<skill>" from the picker re-opens the picker with
-            # query="<skill>" (looks like a flash / no-op). Only treat as a
-            # filter query when it doesn't resolve to a known command/skill.
-            try:
-                from src.command_surface import build_command_list
-
-                cwd = self.tool_context.cwd or self.tool_context.workspace_root
-                infos = build_command_list(project_root=cwd)
-                known = {f"/{info.name.lower()}" for info in infos}
-                for info in infos:
-                    for a in info.aliases:
-                        known.add(f"/{a.lower()}")
-            except Exception:
-                known = set()
-            if raw.lower() not in known:
-                query = raw[1:]
-                if query:
-                    self._open_command_center(query=query)
-                    return
+            query = raw[1:]
+            if query:
+                self._open_command_center(query=query)
+                return
 
         # First, try the shared command surface
         if raw.startswith("/"):
@@ -1163,7 +1144,7 @@ class ClawdREPL:
 - `/tool <name> <json>` - Run a tool directly
 - `/skills` - List all available skills
 - `/permissions` - List always-allow rules and set the session permission mode (`/permissions forget <Tool>`, `/permissions clear`, `/permissions mode <default|acceptEdits|dontAsk|bypassPermissions>`)
-- `/rewind` - List file checkpoints; `/rewind <#>` restores one
+- `/rewind` - List file checkpoints; `/rewind <#>` restores one; `/rewind git <#>` restores a git snapshot (files + conversation)
 - `/plan` - Enter plan mode (explore only); `/plan off` to leave
 - `/init` - Create CLAUDE.md file for the project
 - `/model` - Switch provider/model mid-session
@@ -1455,16 +1436,13 @@ class ClawdREPL:
         self.console.print(f"[dim]{render_status(self)}[/dim]\n")
 
     def _handle_mcp_command(self, raw: str) -> None:
-        """List configured MCP servers, or add a server.
+        """List configured MCP servers, or add a stdio server.
 
         /mcp                            list servers
-        /mcp add <name> <command|url> [args...]   add a server
-        /mcp add <url> / /mcp add-link <url> [name]  auto-install from a link
-        /mcp <url>                      same as add-link
+        /mcp add <name> <command> [args...]   add a server (prompts for missing parts)
         """
         from src.command_system.builtins import (
             add_mcp_server,
-            auto_install_mcp_from_link,
             get_mcp_config_path,
             list_mcp_servers,
         )
@@ -1472,43 +1450,7 @@ class ClawdREPL:
         parts = raw.strip().split()
         action = parts[1].lower() if len(parts) > 1 else "list"
 
-        # Bare URL: /mcp <url>
-        if action.startswith(("http://", "https://")):
-            try:
-                entry = auto_install_mcp_from_link(action)
-            except ValueError as e:
-                self.console.print(f"[red]MCP install failed: {e}[/red]")
-                return
-            self._print_mcp_entry(entry)
-            return
-
-        if action in {"add-link", "addlink", "from-link", "install"}:
-            link = parts[2] if len(parts) > 2 else ""
-            hint = parts[3] if len(parts) > 3 else None
-            if not link:
-                try:
-                    link = input("Link: ").strip()
-                except (EOFError, KeyboardInterrupt):
-                    self.console.print()
-                    return
-            try:
-                entry = auto_install_mcp_from_link(link, hint)
-            except ValueError as e:
-                self.console.print(f"[red]MCP install failed: {e}[/red]")
-                return
-            self._print_mcp_entry(entry)
-            return
-
         if action == "add":
-            # Link-only: /mcp add <url>
-            if len(parts) == 3 and parts[2].lower().startswith(("http://", "https://")):
-                try:
-                    entry = auto_install_mcp_from_link(parts[2])
-                except ValueError as e:
-                    self.console.print(f"[red]MCP install failed: {e}[/red]")
-                    return
-                self._print_mcp_entry(entry)
-                return
             name = parts[2] if len(parts) > 2 else ""
             command = parts[3] if len(parts) > 3 else ""
             extra_args = parts[4:] if len(parts) > 4 else []
@@ -1516,44 +1458,34 @@ class ClawdREPL:
                 if not name:
                     name = input("Server name: ").strip()
                 if not command:
-                    command = input("Command or URL: ").strip()
-                if not extra_args and not command.lower().startswith(("http://", "https://")):
+                    command = input("Command: ").strip()
+                if not extra_args:
                     arg_line = input("Args (space-separated, optional): ").strip()
                     extra_args = arg_line.split() if arg_line else []
             except (EOFError, KeyboardInterrupt):
                 self.console.print()
-                return
-            # URL as command with no name details -> auto-install keeps typed name
-            if command.lower().startswith(("http://", "https://")) and not extra_args:
-                from src.command_system.builtins import add_mcp_server_url
-
-                try:
-                    entry = add_mcp_server_url(name, command)
-                except ValueError as e:
-                    self.console.print(f"[red]{e}[/red]")
-                    return
-                self._print_mcp_entry(entry)
                 return
             try:
                 entry = add_mcp_server(name, command, extra_args)
             except ValueError as e:
                 self.console.print(f"[red]{e}[/red]")
                 return
-            self._print_mcp_entry(entry)
+            arg_str = (" " + " ".join(entry["args"])) if entry["args"] else ""
+            self.console.print(
+                f"[green]Added MCP server '{entry['name']}': {entry['command']}{arg_str}[/green]"
+            )
+            self.console.print(f"[dim]Saved to {get_mcp_config_path()}[/dim]\n")
             return
 
         servers = list_mcp_servers()
         if not servers:
             self.console.print("\n[bold]MCP servers:[/bold] [dim](none)[/dim]")
-            self.console.print("[dim]Paste a link: /mcp add-link <url> — or /mcp add <name> <command|url> [args...][/dim]\n")
+            self.console.print("[dim]Add one with /mcp add <name> <command> [args...][/dim]\n")
             return
         body = []
         for s in servers:
-            if s.get("url"):
-                body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['url']} (remote)[/dim]")
-            else:
-                arg_str = (" " + " ".join(s["args"])) if s["args"] else ""
-                body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['command']}{arg_str}[/dim]")
+            arg_str = (" " + " ".join(s["args"])) if s["args"] else ""
+            body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['command']}{arg_str}[/dim]")
         self.console.print()
         self.console.print(
             Panel(
@@ -1563,20 +1495,7 @@ class ClawdREPL:
                 padding=(1, 2),
             )
         )
-        self.console.print("[dim]Paste a link: /mcp add-link <url> — or /mcp add <name> <command|url> [args...][/dim]\n")
-
-    def _print_mcp_entry(self, entry: dict) -> None:
-        from src.command_system.builtins import get_mcp_config_path
-
-        if entry.get("url"):
-            detail = f"{entry['url']} (remote)"
-        else:
-            arg_str = (" " + " ".join(entry["args"])) if entry.get("args") else ""
-            detail = f"{entry.get('command', '')}{arg_str}"
-        self.console.print(f"[green]Added MCP server '{entry['name']}': {detail}[/green]")
-        if entry.get("note"):
-            self.console.print(f"[dim]{entry['note']}[/dim]")
-        self.console.print(f"[dim]Saved to {get_mcp_config_path()}[/dim]\n")
+        self.console.print("[dim]Add one with /mcp add <name> <command> [args...][/dim]\n")
 
     def _handle_resume_command(self, raw: str) -> None:
         """Pick a saved session to resume.
@@ -1658,36 +1577,94 @@ class ClawdREPL:
 
         /rewind           list checkpoints for this session
         /rewind <n>       restore checkpoint <n>
+        /rewind git <n>   restore git snapshot checkpoint <n> (files + conversation)
         """
         from src.tool_system import checkpoints
+        from src.tool_system import git_checkpoints as gcp
 
         session_id = self.session.session_id
         root = self.tool_context.workspace_root
         parts = raw.strip().split()
+        if len(parts) >= 2 and parts[1].lower() == "git":
+            self._handle_git_rewind(parts[2:], session_id, root)
+            return
         if len(parts) == 1:
             cps = checkpoints.list_checkpoints(session_id, root)
-            if not cps:
+            git_cps = []
+            if gcp.snapshot_enabled():
+                git_cps = gcp.list_git_checkpoints(session_id, root)
+            if not cps and not git_cps:
                 self.console.print("[dim]No checkpoints this session yet.[/dim]")
                 return
-            self.console.print(f"\n[bold]File checkpoints[/bold] [dim](session {session_id})[/dim]")
-            for cp in cps:
-                note = "created by Write" if cp.get("new_file") else "before Write/Edit"
-                self.console.print(
-                    f"  [yellow]#{cp['n']:04d}[/yellow]  {cp['relpath']}  "
-                    f"[dim]{cp['created'].replace('T', ' ')} - {note}[/dim]"
-                )
-            self.console.print("[dim]Use /rewind <#> to restore a file to that checkpoint.[/dim]\n")
+            if cps:
+                self.console.print(f"\n[bold]File checkpoints[/bold] [dim](session {session_id})[/dim]")
+                for cp in cps:
+                    note = "created by Write" if cp.get("new_file") else "before Write/Edit"
+                    self.console.print(
+                        f"  [yellow]#{cp['n']:04d}[/yellow]  {cp['relpath']}  "
+                        f"[dim]{cp['created'].replace('T', ' ')} - {note}[/dim]"
+                    )
+                self.console.print("[dim]Use /rewind <#> to restore a file to that checkpoint.[/dim]\n")
+            if git_cps:
+                self._print_git_checkpoints(git_cps, root, session_id)
             return
         try:
             n = int(parts[1])
         except ValueError:
-            self.console.print("[red]Usage: /rewind <#>" + "[/red]")
+            self.console.print("[red]Usage: /rewind <#> or /rewind git <#>[/red]")
             return
         try:
             rel = checkpoints.restore(session_id, n, root)
             self.console.print(f"[green]Restored {rel} from checkpoint #{n:04d}.[/green]")
         except ValueError as e:
             self.console.print(f"[red]{e}[/red]")
+
+    def _print_git_checkpoints(self, git_cps, root, session_id) -> None:
+        """List git snapshot checkpoints with what changed (brief 032)."""
+        from src.tool_system import git_checkpoints as gcp
+
+        repo = gcp.repo_toplevel(root)
+        self.console.print(f"\n[bold]Git snapshot checkpoints[/bold] [dim](session {session_id})[/dim]")
+        for cp in git_cps:
+            summary = gcp.changed_files_summary(repo, cp) if repo else {}
+            files = ", ".join((summary.get("files") or [])[:3])
+            total = summary.get("total", 0)
+            more = f" +{total - 3} more" if total > 3 else ""
+            tool = (cp.get("tool_call") or {}).get("name", "tool")
+            self.console.print(
+                f"  [yellow]git #{cp['n']:04d}[/yellow]  {tool}  "
+                f"[dim]{cp.get('created', '').replace('T', ' ')}[/dim]"
+            )
+            if files:
+                self.console.print(f"      [dim]changed: {files}{more}[/dim]")
+        self.console.print("[dim]Use /rewind git <#> to restore files + conversation.[/dim]\n")
+
+    def _handle_git_rewind(self, args, session_id, root) -> None:
+        """Restore a git snapshot checkpoint: files + conversation rewind."""
+        from src.tool_system import git_checkpoints as gcp
+
+        if not args:
+            git_cps = gcp.list_git_checkpoints(session_id, root)
+            if not git_cps:
+                self.console.print("[dim]No git snapshot checkpoints this session yet.[/dim]")
+                return
+            self._print_git_checkpoints(git_cps, root, session_id)
+            return
+        try:
+            n = int(args[0])
+        except ValueError:
+            self.console.print("[red]Usage: /rewind git <#>[/red]")
+            return
+        try:
+            report = gcp.restore_git_checkpoint(session_id, n, root)
+        except (ValueError, KeyError) as e:
+            self.console.print(f"[red]{e}[/red]")
+            return
+        restored = ", ".join(report.get("restored") or []) or "worktree"
+        dropped = gcp.rewind_conversation(self.session.conversation, {"message_count": report.get("message_count")})
+        extra = f" Deleted {len(report.get('deleted') or [])} file(s) created after the snapshot." if report.get("deleted") else ""
+        conv = f" Rewound conversation by {dropped} message(s)." if dropped else ""
+        self.console.print(f"[green]Restored {restored} from git checkpoint #{n:04d}.{extra}{conv}[/green]")
 
     def _is_recoverable_tool_error(self, tool_name: str, tool_output) -> bool:
         if not isinstance(tool_name, str):
@@ -1903,6 +1880,9 @@ class ClawdREPL:
 
             # Use agent loop with tools for any provider that supports it
             self._current_status = self._thinking_status()
+            # Live conversation reference so git snapshot-before-write (032)
+            # can record the message count for conversation rewind.
+            self.tool_context.conversation = self.session.conversation
             with self._current_status:
                 result = run_agent_loop(
                     conversation=self.session.conversation,
@@ -2049,6 +2029,15 @@ class ClawdREPL:
 
         # Replace current session
         self.session = loaded_session
+        # Brief 020: the tool context follows the session — re-point the
+        # session id and rehydrate the persisted todo list so execution
+        # tracking survives the restart.
+        try:
+            self.tool_context.session_id = loaded_session.session_id
+            from src.tool_system.tools.todo_write import load_session_todos
+            self.tool_context.todos = load_session_todos(loaded_session.session_id)
+        except Exception:
+            pass
         self.console.print(f"[green]Session loaded: {session_id}[/green]")
         self.console.print(f"[dim]Provider: {loaded_session.provider}, Model: {loaded_session.model}[/dim]")
         self.console.print(f"[dim]Messages: {len(loaded_session.conversation.messages)}[/dim]")
