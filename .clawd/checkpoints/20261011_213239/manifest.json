@@ -1,0 +1,18 @@
+{
+  "1": {
+    "n": 1,
+    "relpath": "install-skill/skill.yaml",
+    "flat": "install-skill__skill.yaml",
+    "created": "2026-10-11T21:37:17",
+    "label": "#0001 install-skill/skill.yaml (new file)",
+    "new_file": true
+  },
+  "2": {
+    "n": 2,
+    "relpath": "install-skill/install.sh",
+    "flat": "install-skill__install.sh",
+    "created": "2026-10-11T21:37:20",
+    "label": "#0002 install-skill/install.sh (new file)",
+    "new_file": true
+  }
+}

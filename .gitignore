@@ -1,0 +1,87 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+src/claude-code-ref/
+
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# MyPy
+.mypy_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.Identifier
+
+# Project specific
+archive/
+*.log
+
+# Sensitive files - NEVER COMMIT
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.secret
+secrets.json
+credentials.json
+.secrets/
+
+# Claude Code specific
+.claude/
+CLAUDE.md
+
+# Session data
+sessions/
+.transcripts/
+.port_sessions/
+
+# Claude Code personal settings
+CLAUDE.local.md
+
+# builder venv (local only)
+.builder-venv/
