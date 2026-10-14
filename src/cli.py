@@ -87,8 +87,13 @@ Examples:
     web_parser.add_argument(
         '--port',
         type=int,
-        default=8765,
-        help='Port for the local-network web app (default: 8765)',
+        default=None,
+        help='Port for the local-network web app (default: 8765; with --kill, only kill this port)',
+    )
+    web_parser.add_argument(
+        '--kill',
+        action='store_true',
+        help='Kill running Clawd web app(s) tracked in ~/.clawd (all, or one with --port)',
     )
     web_parser.add_argument(
         '--reload',
@@ -115,11 +120,25 @@ Examples:
     elif args.command == 'config':
         return show_config()
     elif args.command == 'web':
+        if args.kill:
+            from src.web_app import kill_web_apps
+
+            summary = kill_web_apps(port=args.port)
+            if not (summary["killed"] or summary["not_running"] or summary["skipped"]):
+                scope = f" on port {args.port}" if args.port else ""
+                print(f"No tracked Clawd web apps running{scope}.")
+            for entry in summary["killed"]:
+                print(f"Killed Clawd web app on {entry}.")
+            for entry in summary["not_running"]:
+                print(f"{entry}.")
+            for entry in summary["skipped"]:
+                print(f"Could not kill Clawd web app on {entry}.")
+            return 0
         from src.web_app import run_web_app
 
         return run_web_app(
             workspace=Path.cwd(),
-            port=args.port,
+            port=args.port or 8765,
             reload=args.reload,
             reload_worker=args._reload_worker,
         )
