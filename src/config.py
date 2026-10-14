@@ -1,0 +1,223 @@
+"""Configuration management for Clawd Codex."""
+
+from __future__ import annotations
+
+import json
+import base64
+import os
+from pathlib import Path
+from typing import Any, Optional
+
+
+def get_config_path() -> Path:
+    """Get the path to the configuration file."""
+    config_dir = Path.home() / ".clawd"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / "config.json"
+
+
+def _get_default_config_from_providers() -> dict[str, Any]:
+    """Build default config using provider info registry."""
+    from src.providers import PROVIDER_INFO
+
+    return {
+        "default_provider": "anthropic",
+        "providers": {
+            name: {
+                "api_key": "",
+                "base_url": info["default_base_url"],
+                "default_model": info["default_model"],
+            }
+            for name, info in PROVIDER_INFO.items()
+        },
+        "session": {
+            "auto_save": True,
+            "max_history": 100
+        },
+        "agent": {
+            "max_turns": 50
+        }
+    }
+
+
+def get_default_config() -> dict[str, Any]:
+    """Generate default configuration."""
+    return _get_default_config_from_providers()
+
+
+def _encode_api_key(api_key: str) -> str:
+    """Encode API key for basic obfuscation."""
+    return base64.b64encode(api_key.encode()).decode()
+
+
+def _decode_api_key(encoded_key: str) -> str:
+    """Decode API key."""
+    try:
+        return base64.b64decode(encoded_key.encode()).decode()
+    except Exception:
+        # If decoding fails, return as-is (might be plain text)
+        return encoded_key
+
+
+def load_config() -> dict[str, Any]:
+    """Load configuration from file.
+
+    Returns:
+        Configuration dictionary
+    """
+    config_path = get_config_path()
+
+    if not config_path.exists():
+        # Create default config
+        config = get_default_config()
+        save_config(config)
+        return config
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        providers = config.setdefault("providers", {})
+        from src.providers import PROVIDER_INFO
+
+        needs_save = False
+        for provider_name, info in PROVIDER_INFO.items():
+            provider_config = providers.setdefault(provider_name, {})
+            if "api_key" not in provider_config:
+                provider_config["api_key"] = ""
+                needs_save = True
+            if "base_url" not in provider_config:
+                provider_config["base_url"] = info["default_base_url"]
+                needs_save = True
+            if "default_model" not in provider_config:
+                provider_config["default_model"] = info["default_model"]
+                needs_save = True
+
+        # Decode API keys
+        for provider_name, provider_config in providers.items():
+            if provider_config.get("api_key"):
+                provider_config["api_key"] = _decode_api_key(provider_config["api_key"])
+
+        if config.get("default_provider") is None:
+            config["default_provider"] = "anthropic"
+            needs_save = True
+
+        if needs_save:
+            save_config(config)
+
+        return config
+    except Exception as e:
+        print(f"Error loading config: {e}")
+        return get_default_config()
+
+
+def save_config(config: dict[str, Any]) -> None:
+    """Save configuration to file.
+
+    Args:
+        config: Configuration dictionary to save
+    """
+    config_path = get_config_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create a copy to avoid modifying the original
+    config_copy = json.loads(json.dumps(config))
+
+    # Encode API keys
+    for provider_name, provider_config in config_copy.get("providers", {}).items():
+        if provider_config.get("api_key"):
+            provider_config["api_key"] = _encode_api_key(provider_config["api_key"])
+
+    if os.name == "nt":
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config_copy, f, indent=2, ensure_ascii=False)
+    else:
+        fd = os.open(
+            config_path,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            0o600,
+        )
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(config_copy, f, indent=2, ensure_ascii=False)
+        os.chmod(config_path, 0o600)
+
+
+def get_provider_config(provider: str) -> dict[str, Any]:
+    """Get configuration for a specific provider.
+
+    Args:
+        provider: Provider name (anthropic, openai, nvidia, glm, minimax)
+
+    Returns:
+        Provider configuration dictionary
+    """
+    config = load_config()
+    providers = config.get("providers", {})
+
+    if provider not in providers:
+        raise ValueError(f"Unknown provider: {provider}")
+
+    return providers[provider]
+
+
+def set_api_key(provider: str, api_key: str, base_url: Optional[str] = None,
+                default_model: Optional[str] = None) -> None:
+    """Set API key for a provider.
+
+    Args:
+        provider: Provider name (anthropic, openai, nvidia, glm, minimax)
+        api_key: API key to set
+        base_url: Optional base URL override
+        default_model: Optional default model override
+    """
+    config = load_config()
+
+    if provider not in config.get("providers", {}):
+        # Add new provider if it doesn't exist
+        if "providers" not in config:
+            config["providers"] = {}
+        config["providers"][provider] = {}
+
+    config["providers"][provider]["api_key"] = api_key
+
+    if base_url is not None:
+        config["providers"][provider]["base_url"] = base_url
+
+    if default_model is not None:
+        config["providers"][provider]["default_model"] = default_model
+
+    save_config(config)
+
+
+def set_default_provider(provider: str) -> None:
+    """Set the default provider.
+
+    Args:
+        provider: Provider name
+    """
+    config = load_config()
+    config["default_provider"] = provider
+    save_config(config)
+
+
+def get_default_provider() -> str:
+    """Get the default provider.
+
+    Returns:
+        Default provider name
+    """
+    config = load_config()
+    return config.get("default_provider", "anthropic")
+
+
+def powershell_opt_in() -> bool:
+    """Whether the PowerShell tool is explicitly enabled.
+
+    Opt-in config key "enable_powershell" in ~/.clawd/config.json; default
+    off. Never raises -- returns False when the config can't be read.
+    """
+    try:
+        config = load_config()
+    except Exception:
+        return False
+    return bool(config.get("enable_powershell", False))
