@@ -575,11 +575,29 @@ class TestPowerShellOptIn(unittest.TestCase):
         self.assertTrue(result.is_error)
         self.assertIn("only supported on Windows", result.output.get("error", ""))
 
-    def test_windows_without_opt_in_is_gated(self) -> None:
+    def test_windows_default_on_executes(self) -> None:
         from src.tool_system.tools import misc as misc_module
         from src.tool_system.tools.misc import PowerShellTool
 
         tool = PowerShellTool()
+        # default context: enable_powershell=True (default ON)
+        fake_completed = unittest.mock.Mock(returncode=0, stdout="hi\n", stderr="")
+        with unittest.mock.patch.object(
+            misc_module.platform, "system", return_value="Windows"
+        ), unittest.mock.patch.object(
+            misc_module.subprocess, "run", return_value=fake_completed
+        ) as mock_run:
+            result = tool.run({"command": "Write-Host hi"}, self.ctx)
+        self.assertFalse(result.is_error)
+        args = mock_run.call_args[0][0]
+        self.assertEqual(args[0], "powershell")
+
+    def test_windows_explicit_opt_out_is_gated(self) -> None:
+        from src.tool_system.tools import misc as misc_module
+        from src.tool_system.tools.misc import PowerShellTool
+
+        tool = PowerShellTool()
+        self.ctx.enable_powershell = False
         with unittest.mock.patch.object(
             misc_module.platform, "system", return_value="Windows"
         ):
@@ -587,7 +605,7 @@ class TestPowerShellOptIn(unittest.TestCase):
         self.assertTrue(result.is_error)
         error = result.output.get("error", "")
         self.assertIn("enable_powershell", error)
-        self.assertIn("not enabled", error)
+        self.assertIn("disabled", error)
 
     def test_windows_with_opt_in_executes(self) -> None:
         from src.tool_system.tools import misc as misc_module
@@ -609,21 +627,21 @@ class TestPowerShellOptIn(unittest.TestCase):
         self.assertEqual(args[0], "powershell")
         self.assertIn("Write-Host hi", args)
 
-    def test_powershell_opt_in_config_defaults_off(self) -> None:
+    def test_powershell_opt_in_config_defaults_on(self) -> None:
         from src.config import powershell_opt_in
 
         with unittest.mock.patch(
             "src.config.load_config", return_value={}
         ):
-            self.assertFalse(powershell_opt_in())
-        with unittest.mock.patch(
-            "src.config.load_config", return_value={"enable_powershell": True}
-        ):
             self.assertTrue(powershell_opt_in())
+        with unittest.mock.patch(
+            "src.config.load_config", return_value={"enable_powershell": False}
+        ):
+            self.assertFalse(powershell_opt_in())
         with unittest.mock.patch(
             "src.config.load_config", side_effect=OSError("nope")
         ):
-            self.assertFalse(powershell_opt_in())
+            self.assertTrue(powershell_opt_in())
 
 
 class TestStatusBarPermissionMode(unittest.TestCase):
