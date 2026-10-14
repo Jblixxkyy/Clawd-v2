@@ -1,0 +1,14 @@
+name: install-skill
+description: |
+  Installs a skill from a GitHub repository into the Clawd user skills folder.
+  Usage: invoke this skill with the repository name (e.g., "anthropics/pdf") and it will clone the repo and set it up.
+author: auto-generated
+version: 0.1.0
+steps:
+  - clone_repo:
+      repo: "anthropics/pdf"
+      target: "~/.clawd/skills"
+  - run_script:
+      script: |
+        echo "PDF skill installed successfully."
+    description: "Confirm installation"

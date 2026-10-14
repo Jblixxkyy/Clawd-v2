@@ -1,0 +1,7 @@
+{
+  "PostToolUse": [
+    {
+      "command": "python3 /path/to/clawd-code/hooks/examples/verify-after-edit.py"
+    }
+  ]
+}
