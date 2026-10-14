@@ -8,10 +8,12 @@
 
 *From TypeScript Source → Rebuilt in Python with ❤️*
 
+**Community V2 continuation** — the actively developed fork of [GPT-AGI/Clawd-Code](https://github.com/GPT-AGI/Clawd-Code), rebuilt into the best model-agnostic agent harness. See [What's new in V2](#-whats-new-in-v2) below.
+
 ***
 
-[![GitHub stars](https://img.shields.io/github/stars/GPT-AGI/Clawd-Code?style=for-the-badge&logo=github&color=yellow)](https://github.com/GPT-AGI/Clawd-Code/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/GPT-AGI/Clawd-Code?style=for-the-badge&logo=github&color=blue)](https://github.com/GPT-AGI/Clawd-Code/network/members)
+[![GitHub stars](https://img.shields.io/github/stars/Jblixxkyy/Clawd-v2?style=for-the-badge&logo=github&color=yellow)](https://github.com/Jblixxkyy/Clawd-v2/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Jblixxkyy/Clawd-v2?style=for-the-badge&logo=github&color=blue)](https://github.com/Jblixxkyy/Clawd-v2/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 
@@ -56,15 +58,33 @@
 
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/?repos=GPT-AGI%2FClawd-Code&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=Jblixxkyy%2FClawd-v2&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=GPT-AGI%2FClawd-Code&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=GPT-AGI%2FClawd-Code&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=GPT-AGI%2FClawd-Code&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Jblixxkyy%2FClawd-v2&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Jblixxkyy%2FClawd-v2&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Jblixxkyy%2FClawd-v2&type=date&legend=top-left" />
  </picture>
 </a>
 
 ## ✨ Features
+
+## 🆕 What's new in V2
+
+Everything below was built on top of the original port — verified against the code in `src/`:
+
+- **True agentic subagents** — `Subagent`/`SubagentOutput` tools run a real LLM-driven child loop with a filtered tool registry, model override, and background mode (not a fixed call list)
+- **Tool-call loop detection** — sha256 signature over tool+input+output across a 10-step window; 5+ repeats stops the turn instead of burning all 50
+- **Tool input auto-repair** — coerces `{"limit":"20"}` → `{"limit":20}` (stringified objects/arrays, numeric/boolean strings, null placeholders) before validation
+- **Richer hook lifecycle** — 9 events: SessionStart/End, BeforeAgent/AfterAgent, PreCompress, BeforeModel/AfterModel, PreToolUse/PostToolUse, with block/ask and fail-open
+- **$skill:// mentions** — explicit skill invocation (`$skill://pdf`) routed through the Skill tool path
+- **A2A client** — stdlib JSON-RPC client plus `DelegateAgent` tool to delegate work to external agents
+- **WebFetch resume offsets** — `offset` parameter to continue truncated pages, unread counts, 5-URL/1MB LRU cache
+- **Live-reload of instructions** — AGENTS.md/CLAUDE.md watched via mtime+sha256; mid-session edits surface as a system-reminder diff
+- **Prompt diet** — lean static core prompt with conditional per-tool guidance (opencode parity)
+- **Quiet tool display** — one dim line per tool call instead of twin bordered panels
+- **ChatGPT-parity web UI** — slim expandable tool rows, syntax-highlighted code blocks, regenerate/edit/like-dislike, chat search, markdown export
+- **NVIDIA NIM provider** — first-class provider alongside Anthropic, OpenAI, GLM, and MiniMax
+- **In-agent cron + LSP integration** — scheduled jobs and language-server tools built into the harness
 
 ### Streaming Agent Experience
 
@@ -102,7 +122,7 @@ Explain the code in $path. Start with an analogy, then draw a diagram.
 ### Multi-Provider Support
 
 ```python
-providers = ["Anthropic Claude", "OpenAI GPT", "Zhipu GLM"]  # + easy to extend
+providers = ["Anthropic Claude", "OpenAI GPT", "NVIDIA NIM", "Zhipu GLM", "MiniMax"]  # + easy to extend
 ```
 
 ### Interactive REPL
@@ -141,8 +161,8 @@ When developing Clawd itself, use `clawd web --reload` instead. It watches Pytho
 | Component     | Status     | Count     |
 | ------------- | ---------- | --------- |
 | REPL Commands | ✅ Complete | 6+ built-ins |
-| Tool System   | ✅ Complete | 30+ tools |
-| Automated Tests | ✅ Present | Core suites for skills, providers, REPL, tools, context |
+| Tool System   | ✅ Complete | 46 tools |
+| Automated Tests | ✅ Present | 791 tests passing — skills, providers, REPL, tools, context |
 | Documentation | ✅ Complete | 10+ docs  |
 
 ### Core Systems
@@ -151,23 +171,23 @@ When developing Clawd itself, use `clawd web --reload` instead. It watches Pytho
 |--------|--------|-------------|
 | CLI Entry | ✅ | `clawd`, `login`, `config`, `--version` |
 | Interactive REPL | ✅ | Rich interactive output, history, tab completion, multiline |
-| Multi-Provider | ✅ | Anthropic, OpenAI, GLM support |
+| Multi-Provider | ✅ | Anthropic, OpenAI, NVIDIA NIM, GLM, MiniMax support |
 | Session Persistence | ✅ | Save/load sessions locally |
 | Agent Loop | ✅ | Tool calling loop implementation |
 | Skill System | ✅ | SKILL.md-based slash-command skills with args + tool limits |
 | Context Building | 🟡 | Initial prompt injection for workspace, git, and CLAUDE.md; deeper project understanding still needed |
 | Permission System | 🟡 | Framework exists, needs integration |
 
-### Tool System (30+ Tools Implemented)
+### Tool System (46 Tools Implemented)
 
 | Category | Tools | Status |
 |----------|-------|--------|
 | File Operations | Read, Write, Edit, Glob, Grep | ✅ Complete |
-| System | Bash execution | ✅ Complete |
+| System | Bash + PowerShell (default on Windows) | ✅ Complete |
 | Web | WebFetch, WebSearch | ✅ Complete |
 | Interaction | AskUserQuestion, SendMessage | ✅ Complete |
 | Task Management | TodoWrite, TaskManager, TaskStop | ✅ Complete |
-| Agent Tools | Agent, Brief, Team | ✅ Complete |
+| Agent Tools | Agent, Brief, Team, Subagent, SubagentOutput | ✅ Complete |
 | Configuration | Config, PlanMode, Cron | ✅ Complete |
 | MCP | MCP tools and resources | ✅ Complete |
 | Others | LSP, Worktree, Skill, ToolSearch | ✅ Complete |
@@ -188,8 +208,8 @@ When developing Clawd itself, use `clawd web --reload` instead. It watches Pytho
 ### Install
 
 ```bash
-git clone https://github.com/GPT-AGI/Clawd-Code.git
-cd Clawd-Code
+git clone https://github.com/Jblixxkyy/Clawd-v2.git
+cd Clawd-v2
 
 # Create venv (uv recommended)
 uv venv --python 3.11
@@ -247,6 +267,11 @@ The configuration file is saved in in `~/.clawd/config.json`. Example structure:
       "api_key": "base64-encoded-key",
       "base_url": "https://api.openai.com/v1",
       "default_model": "gpt-4"
+    },
+    "nvidia": {
+      "api_key": "base64-encoded-key",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "default_model": "nvidia/nemotron-3.5-lightning-30b-a3b"
     },
     "glm": {
       "api_key": "base64-encoded-key",
@@ -462,8 +487,8 @@ If you find this useful, please **star** ⭐ the repo!
 
 ***
 
-[![GitHub stars](https://img.shields.io/github/stars/GPT-AGI/Clawd-Code?style=for-the-badge&logo=github&color=yellow)](https://github.com/GPT-AGI/Clawd-Code/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/GPT-AGI/Clawd-Code?style=for-the-badge&logo=github&color=blue)](https://github.com/GPT-AGI/Clawd-Code/network/members)
+[![GitHub stars](https://img.shields.io/github/stars/Jblixxkyy/Clawd-v2?style=for-the-badge&logo=github&color=yellow)](https://github.com/Jblixxkyy/Clawd-v2/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Jblixxkyy/Clawd-v2?style=for-the-badge&logo=github&color=blue)](https://github.com/Jblixxkyy/Clawd-v2/network/members)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 
@@ -637,8 +662,8 @@ clawd config       # 查看设置
 ### 安装
 
 ```bash
-git clone https://github.com/GPT-AGI/Clawd-Code.git
-cd Clawd-Code
+git clone https://github.com/Jblixxkyy/Clawd-v2.git
+cd Clawd-v2
 
 # 创建虚拟环境（推荐使用 uv）
 uv venv --python 3.11
