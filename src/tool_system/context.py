@@ -9,6 +9,46 @@ from .permissions import PermissionMode, ToolPermissionContext
 from .task_manager import TaskManager
 
 
+def _default_skill_dirs() -> list[Path]:
+    """Global skill roots that must stay readable regardless of workspace."""
+    import os
+
+    dirs: list[Path] = []
+    for _env in ("CLAWD_SKILLS_DIR", "CLAUDE_SKILLS_DIR"):
+        _v = os.environ.get(_env)
+        if _v:
+            try:
+                _p = Path(_v).expanduser().resolve()
+                if _p not in dirs:
+                    dirs.append(_p)
+            except Exception:
+                pass
+    for _d in (Path.home() / ".clawd" / "skills", Path.home() / ".claude" / "skills"):
+        try:
+            _p = _d.expanduser().resolve()
+            if _p not in dirs:
+                dirs.append(_p)
+        except Exception:
+            pass
+    _managed = os.environ.get("CLAWD_MANAGED_SKILLS_DIR")
+    if _managed:
+        try:
+            _p = Path(_managed).expanduser().resolve()
+            if _p not in dirs:
+                dirs.append(_p)
+        except Exception:
+            pass
+    else:
+        try:
+            # src/tool_system/context.py -> src/ -> repo/managed_skills
+            _fallback = Path(__file__).resolve().parent.parent.parent / "managed_skills"
+            if _fallback not in dirs:
+                dirs.append(_fallback)
+        except Exception:
+            pass
+    return dirs
+
+
 @dataclass
 class ToolContext:
     workspace_root: Path
@@ -71,6 +111,46 @@ class ToolContext:
                 additional_working_directories=self.permission_context.additional_working_directories,
                 allow_docs=self.permission_context.allow_docs,
             )
+        # Skills must be readable from anywhere: managed + user skill dirs
+        # live outside the workspace (e.g. D:\clawd\...\managed_skills while
+        # cwd is C:\Users\...). Pre-whitelist them so Read/Glob on
+        # "Base directory for this skill" never hits
+        # "path is outside allowed working directories".
+        # Per-skill whitelisting also happens in SkillTool.run for any
+        # custom location; this covers discovery without a Skill call.
+        try:
+            for _d in _default_skill_dirs():
+                if _d not in self.permission_context.additional_working_directories:
+                    # Only add existing dirs to keep allowed_roots() clean.
+                    if _d.exists() and _d.is_dir():
+                        self.permission_context.additional_working_directories = (
+                            *self.permission_context.additional_working_directories,
+                            _d,
+                        )
+            # Repo-owned skills: .clawd/skills / .claude/skills in workspace
+            # or any ancestor (repo root while cwd is a subdir). Whitelist
+            # existing ones so Read/Glob work even when ancestor is outside
+            # workspace_root.
+            for _base in {self.workspace_root, self.cwd}:
+                if _base is None:
+                    continue
+                _cur: Path | None = _base
+                while _cur is not None:
+                    for _cand in (_cur / ".clawd" / "skills", _cur / ".claude" / "skills"):
+                        try:
+                            if _cand.exists() and _cand.is_dir() and _cand.resolve() not in self.permission_context.additional_working_directories:
+                                self.permission_context.additional_working_directories = (
+                                    *self.permission_context.additional_working_directories,
+                                    _cand.resolve(),
+                                )
+                        except Exception:
+                            pass
+                    _nxt = _cur.parent
+                    if _nxt == _cur:
+                        break
+                    _cur = _nxt
+        except Exception:
+            pass
 
     def mark_file_read(self, path: Path) -> None:
         stat = path.stat()

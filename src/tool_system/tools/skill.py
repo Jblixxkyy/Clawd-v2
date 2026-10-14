@@ -104,6 +104,21 @@ class SkillTool:
             argument_names=skill.arg_names,
         )
         if skill.skill_root:
+            # Whitelist the skill dir so subsequent Read/Glob/Edit on
+            # "Base directory for this skill" don't fail with
+            # "path is outside allowed working directories" when the skill
+            # ships outside the current workspace (e.g. managed_skills in the
+            # install dir while cwd is C:\Users\...).
+            try:
+                from pathlib import Path as _Path
+
+                _root = _Path(skill.skill_root).expanduser().resolve()
+                _pc = context.permission_context
+                _existing = tuple(_pc.additional_working_directories or ())
+                if _root not in _existing:
+                    _pc.additional_working_directories = _existing + (_root,)
+            except Exception:
+                pass
             content = f"Base directory for this skill: {skill.skill_root}\n\n{content}"
             skill_dir = skill.skill_root.replace("\\", "/")
             content = content.replace("${CLAUDE_SKILL_DIR}", skill_dir)

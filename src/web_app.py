@@ -26,6 +26,11 @@ from urllib.parse import parse_qs, urlsplit
 from urllib.request import urlopen
 
 from src.agent import Session
+from src.agent.conversation import (
+    TextContentBlock,
+    ToolUseContentBlock,
+    ToolResultContentBlock,
+)
 from src.config import (
     get_default_provider,
     get_provider_config,
@@ -142,6 +147,14 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 .primary-button{padding:9px 13px;border:0;border-radius:6px;background:var(--btn-primary-bg);color:var(--btn-primary-fg);font-size:12px}
 .hint{color:var(--muted);font-size:10px}
 .folder-picker{position:fixed;inset:0;z-index:8;display:grid;place-items:center;padding:20px;background:#0009}
+.composer-card{position:relative}
+.mention-menu{position:absolute;left:10px;right:10px;bottom:calc(100% + 8px);z-index:7;max-height:280px;overflow:auto;padding:6px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 16px 60px #0009}
+.mention-menu[hidden]{display:none}
+.mention-group{padding:6px 10px 2px;color:var(--muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.mention-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;text-align:left;color:var(--text);font-size:12px}
+.mention-item:hover,.mention-item.active{background:var(--hover-strong)}
+.mention-icon{flex:none;width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--border);border-radius:7px;background:var(--subtle);font-size:13px}
+.mention-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}.mention-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.mention-desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px}.mention-kind{flex:none;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
 .model-picker{position:fixed;inset:0;z-index:9;display:grid;place-items:end center;padding:0 20px max(92px,11vh);background:#0007}
 .model-picker[hidden]{display:none}
 .model-picker-dialog{width:min(100%,380px);max-height:min(58vh,440px);display:flex;flex-direction:column;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--panel);box-shadow:0 16px 60px #0009}
@@ -248,7 +261,7 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 </div>
 <button class="scroll-bottom" id="scrollBottom" type="button" hidden aria-label="Scroll to bottom">↓</button>
 <div class="notice" id="notice" aria-live="polite"></div>
-<div class="composer-zone"><form id="composer"><div class="composer-card"><textarea id="prompt" placeholder="Ask anything about this project…" rows="2"></textarea><div class="composer-toolbar"><button class="composer-model" id="composerModel" type="button" title="Change provider and model"></button><span class="composer-actions"><button class="stop-button" id="stop" type="button" hidden aria-label="Stop response"><span class="stop-icon"></span></button><button class="send-button" id="send" type="submit" aria-label="Send message">↑</button></span></div></div><div class="composer-hint">Enter to send · Shift+Enter for a new line</div></form></div>
+<div class="composer-zone"><form id="composer"><div class="composer-card"><div class="mention-menu" id="mentionMenu" hidden></div><textarea id="prompt" placeholder="Ask anything about this project…  ( / for commands · @ for files & skills )" rows="2"></textarea><div class="composer-toolbar"><button class="composer-model" id="composerModel" type="button" title="Change provider and model"></button><span class="composer-actions"><button class="stop-button" id="stop" type="button" hidden aria-label="Stop response"><span class="stop-icon"></span></button><button class="send-button" id="send" type="submit" aria-label="Send message">↑</button></span></div></div><div class="composer-hint">Enter to send · Shift+Enter for a new line</div></form></div>
 </section>
 </div>
 </div>
@@ -264,6 +277,7 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 <div class="settings-group"><label class="settings-label" for="settingsProvider">Provider</label><select class="settings-select" id="settingsProvider"></select><div class="settings-note" id="settingsKeyNote"></div><input class="settings-input" id="settingsApiKey" type="password" placeholder="Paste API key to save it for this provider" autocomplete="off" style="margin-top:8px"></div>
 <div class="settings-group"><label class="settings-label" for="settingsModel">Model</label><select class="settings-select" id="settingsModel"></select></div>
 <div class="settings-group"><span class="settings-label">Theme</span><div class="theme-picker" id="themePicker"><button type="button" data-theme-value="dark">Dark</button><button type="button" data-theme-value="light">Light</button><button type="button" data-theme-value="system">System</button></div></div>
+<div class="settings-group"><label class="settings-label" for="settingsAutoDelete" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="settingsAutoDelete" style="width:15px;height:15px">Auto-delete chats whose folder is gone</label><div class="settings-note">When on, chats pointing at a deleted folder never show in the sidebar and are removed automatically.</div><div class="settings-note"><button type="button" id="cleanupSessions" class="secondary-button" style="margin-top:6px">Clean up broken chats now</button></div></div>
 <div class="folder-actions"><button class="secondary-button" id="cancelSettings" type="button">Cancel</button><button class="primary-button" id="saveSettings" type="button">Save</button></div></div>
 </section>
 <section class="model-picker" id="modelPicker" hidden>
@@ -290,7 +304,7 @@ let currentDirectory=null;
 let selectedFolderPath=null;
 async function watchForReload(){let version=null;const check=async()=>{try{const response=await fetch("/api/dev-version",{cache:"no-store"});if(!response.ok)return;const data=await response.json();if(!data.enabled)return;if(version!==null&&version!==data.version){location.reload();return}version=data.version}catch{}setTimeout(check,1000)};check()}
 watchForReload();
-async function api(path,options={}){const r=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});const data=await r.json();if(!r.ok)throw Error(data.error||"Request failed");return data}
+async function api(path,options={}){const r=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});let data=null;try{data=await r.json()}catch(e){data=null}if(!r.ok){const err=Error((data&&data.error)||"Request failed");err.code=r.status;err.payload=data;throw err}return data||{}}
 function updateWorkspace(path){const name=path.split(/[\\/]/).filter(Boolean).pop()||path;document.querySelector("#projectName").textContent=name;document.querySelector("#sidebarPath").textContent=path;document.querySelector("#topProject").textContent=name;document.querySelector("#sessionTitle").textContent="New session"}
 function updateSessionWorkspace(path){const name=path.split(/[\\/]/).filter(Boolean).pop()||path;document.querySelector("#projectName").textContent=name;document.querySelector("#sidebarPath").textContent=path;document.querySelector("#topProject").textContent=name}
 function appendInline(parent,text){const pattern=/<br\s*\/?>|`([^`\n]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)|\*\*([\s\S]+?)\*\*|__([\s\S]+?)__|~~([\s\S]+?)~~|\*([^*\n]+)\*|_([^_\n]+)_/gi;let cursor=0,match;while((match=pattern.exec(text))){if(match.index>cursor)parent.append(document.createTextNode(text.slice(cursor,match.index).replace(/\\([\\`*_{}[\]()#+.!>-])/g,"$1")));if(/^<br/i.test(match[0]))parent.append(document.createElement("br"));else if(match[1]){const code=document.createElement("code");code.textContent=match[1];parent.append(code)}else if(match[2]){let url;try{url=new URL(match[3],location.href)}catch{}if(url&&(url.protocol==="https:"||url.protocol==="http:"||url.protocol==="mailto:")){const link=document.createElement("a");link.href=url.toString();link.rel="noopener noreferrer";link.target="_blank";appendInline(link,match[2]);parent.append(link)}else parent.append(document.createTextNode(match[0]))}else{const tag=match[4]||match[5]?"strong":match[6]?"del":"em",value=match[4]||match[5]||match[6]||match[7]||match[8],node=document.createElement(tag);appendInline(node,value);parent.append(node)}cursor=pattern.lastIndex}if(cursor<text.length)parent.append(document.createTextNode(text.slice(cursor).replace(/\\([\\`*_{}[\]()#+.!>-])/g,"$1")))}
@@ -316,16 +330,19 @@ function setThoughtFor(content,elapsedMs){content._activity.hidden=true;let el=c
 function clearAllActivities(){document.querySelectorAll(".assistant-activity").forEach(el=>{el.hidden=true})}
 function selectSession(sessionId){activeSessionId=sessionId;for(const item of document.querySelectorAll(".session-item")){const active=item.dataset.sessionId===sessionId;item.classList.toggle("active",active);if(active)item.setAttribute("aria-current","page");else item.removeAttribute("aria-current")}setComposerBusy()}
 async function refreshSessions(){try{const result=await api("/api/sessions");lastSessions=result.sessions||[]}catch(e){return}renderSessionList()}
+function dropBrokenSession(sessionId,wasAutoDeleted){lastSessions=lastSessions.filter(s=>s.session_id!==sessionId);renderSessionList();if(wasAutoDeleted)notice.textContent="That chat was automatically deleted because its working folder no longer exists."}
+function handleSessionOpenError(e,sessionId){const p=e&&e.payload||{};if(e&&e.code===410||p.workspace_missing||p.auto_deleted){dropBrokenSession(sessionId,!!p.auto_deleted);refreshSessions().catch(()=>{});if(!p.auto_deleted)notice.textContent=e.message;return true}return false}
 function renderSessionList(){const list=document.querySelector("#sessionsList");const q=(sessionSearch.value||"").trim().toLowerCase();const sessions=q?lastSessions.filter(s=>(s.title||"").toLowerCase().includes(q)):lastSessions;list.replaceChildren();if(!sessions.length){const empty=document.createElement("div");empty.className="sessions-empty";empty.textContent=q?"No chats match":"No saved chats";list.append(empty);return}for(const session of sessions){const row=document.createElement("div");row.className="session-item";row.dataset.sessionId=session.session_id;const open=document.createElement("button");open.type="button";open.className="session-open";open.title=session.title;const title=document.createElement("span");title.className="session-title";title.textContent=session.title;open.append(title);open.onclick=()=>openSavedSession(session.session_id);row.append(open);const renameBtn=document.createElement("button");renameBtn.type="button";renameBtn.className="session-rename";renameBtn.textContent="\u270e";renameBtn.title="Rename chat";renameBtn.setAttribute("aria-label","Rename chat: "+session.title);renameBtn.onclick=e=>{e.stopPropagation();startSessionRename(row,session)};row.append(renameBtn);if(typeof session.session_cost_usd==="number"&&session.session_cost_usd>0){const scost=document.createElement("span");scost.className="session-cost";scost.textContent="$"+session.session_cost_usd.toFixed(4);scost.title="Session spend";row.append(scost)}if(session.running||activeJobs.has(session.session_id)){const status=document.createElement("span");status.className="session-state";status.textContent="Running";status.title="Chat is running";row.append(status)}const remove=document.createElement("button");remove.type="button";remove.className="session-delete";remove.textContent="×";remove.title="Delete saved chat";remove.setAttribute("aria-label","Delete saved chat: "+session.title);remove.disabled=session.running||activeJobs.has(session.session_id);remove.onclick=()=>deleteSavedSession(session.session_id);row.append(remove);if(session.session_id===activeSessionId)row.classList.add("active");list.append(row)}}
 function resetDisplayedConversation(){messages.replaceChildren();toolCards.clear();activeToolGroup=null;welcome.hidden=true;document.querySelector("#interaction")?.remove()}
 function restoreRunningJob(sessionId){const running=activeJobs.get(sessionId);if(!running)return;running.renderedText="";running.renderedEvents=0;running.assistant=null;running.interactionId=null;running.assistant=addMessage("assistant","");if(running.latestText){setAssistantText(running.assistant,running.latestText);running.renderedText=running.latestText}running.assistantText=running.latestText||"";setAssistantActivity(running.assistant,running.latestActivity);const pending=running.pendingDeltas||[];running.pendingDeltas=[];for(const d of pending){if(d.kind==="text"||d.kind==="tool")running.renderedTimeline++;if(d.kind!=="text")renderDelta(running,sessionId,d)}}
-async function openSavedSession(sessionId){try{const saved=await api("/api/session/load",{method:"POST",body:JSON.stringify({session_id:sessionId})});updateSessionWorkspace(saved.workspace);resetDisplayedConversation();for(const message of saved.messages){if(message.text)addMessage(message.role,message.text,message.ts)}document.querySelector("#sessionTitle").textContent=saved.title;promptBox.value="";selectSession(saved.session_id);restoreRunningJob(saved.session_id);notice.textContent=activeJobs.has(saved.session_id)?"This chat is running in the background. You can keep working in another chat.":"";closeSidebar()}catch(e){notice.textContent=e.message}}
+async function openSavedSession(sessionId){try{const saved=await api("/api/session/load",{method:"POST",body:JSON.stringify({session_id:sessionId})});updateSessionWorkspace(saved.workspace);resetDisplayedConversation();for(const message of saved.messages){if(message.content){renderFullMessage(message.role,message.content,message.ts)}else if(message.text){addMessage(message.role,message.text,message.ts)}}document.querySelector("#sessionTitle").textContent=saved.title;promptBox.value="";selectSession(saved.session_id);restoreRunningJob(saved.session_id);notice.textContent=activeJobs.has(saved.session_id)?"This chat is running in the background. You can keep working in another chat.":"";closeSidebar()}catch(e){if(handleSessionOpenError(e,sessionId))return;notice.textContent=e.message}}
+function renderFullMessage(role,blocks,ts){const toolNames={};for(const block of blocks){if(block.type==="text"){addMessage(role,block.text,ts)}else if(block.type==="tool_use"){toolNames[block.id]=block.name;const event={tool_use_id:block.id,tool_name:block.name,input:JSON.stringify(block.input),kind:"tool_use",summary:""};addToolEvent(event)}else if(block.type==="tool_result"){const event={tool_use_id:block.tool_use_id,tool_name:toolNames[block.tool_use_id]||"",output:block.content,error:block.is_error,kind:block.is_error?"tool_error":"tool_result"};addToolEvent(event)}}}
 async function deleteSavedSession(sessionId){if(activeJobs.has(sessionId)){notice.textContent="This chat is still running and cannot be deleted yet.";return}if(!confirm("Delete this saved chat? This cannot be undone."))return;try{const result=await api("/api/session/delete",{method:"POST",body:JSON.stringify({session_id:sessionId})});if(activeSessionId===sessionId){resetConversation();selectSession(result.session_id)}await refreshSessions()}catch(e){notice.textContent=e.message}}
 async function startSessionRename(row,session){const open=row.querySelector(".session-open");if(!open||open.querySelector("input"))return;const input=document.createElement("input");input.type="text";input.className="session-rename-input";input.value=session.title;input.maxLength=120;input.setAttribute("aria-label","Chat name");open.replaceChildren(input);input.focus();input.select();let done=false;const commit=async save=>{if(done)return;done=true;const value=input.value.trim();if(save&&value&&value!==session.title){try{await api("/api/session/rename",{method:"POST",body:JSON.stringify({session_id:session.session_id,title:value})})}catch(e){notice.textContent=e.message}}await refreshSessions()};input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();commit(true)}else if(e.key==="Escape")commit(false)});input.addEventListener("blur",()=>commit(true))}
 function toolDisplayName(name){const key=(name||"Tool").toLowerCase();return ({bash:"Shell",powershell:"Shell",websearch:"Search",webfetch:"Fetch",askuserquestion:"Ask"})[key]||name||"Tool"}
 function formatElapsed(ms){if(ms==null||isNaN(ms)||ms<0)return"";const s=ms/1000;if(s<60){const v=s<10?Math.round(s*10)/10:Math.round(s);return (""+v).replace(/\.0$/,"")+"s"}return Math.floor(s/60)+"m "+Math.round(s%60)+"s"}
 function setToolDiffStat(el,stat){el.replaceChildren();if(!stat)return;const a=stat.added||0,d=stat.removed||0;if(!a&&!d)return;const sa=document.createElement("span");sa.className="add";sa.textContent="+"+a;const sd=document.createElement("span");sd.className="del";sd.textContent="-"+d;el.append(document.createTextNode("("),sa,document.createTextNode(", "),sd,document.createTextNode(")"))}
-function setToolElapsed(el,ms){el.textContent=(ms==null||isNaN(ms))?"":" · "+formatElapsed(ms)}
+function setToolElapsed(el,ms){el.textContent=(ms==null||isNaN(ms))?"":" Â· "+formatElapsed(ms)}
 /* Tiny inline syntax highlighter (no CDN). Regex tokenizer: comments, strings, numbers, keywords, function calls. */
 const HL_KEYWORDS={python:["def","class","return","if","elif","else","for","while","import","from","as","with","try","except","finally","raise","lambda","pass","break","continue","in","is","not","and","or","None","True","False","async","await","yield","global","nonlocal","assert","del","print"],javascript:["function","return","if","else","for","while","const","let","var","import","from","export","default","new","class","extends","try","catch","finally","throw","async","await","typeof","instanceof","in","of","this","null","undefined","true","false","switch","case","break","continue","do"],typescript:["function","return","if","else","for","while","const","let","var","import","from","export","default","new","class","extends","implements","interface","type","enum","try","catch","finally","throw","async","await","typeof","instanceof","in","of","this","null","undefined","true","false","switch","case","break","continue","do","public","private","protected","readonly","static"],bash:["if","then","else","elif","fi","for","while","do","done","case","esac","function","return","exit","export","local","echo","in"],sh:["if","then","else","elif","fi","for","while","do","done","case","esac","function","return","exit","export","local","echo","in"],shell:["if","then","else","elif","fi","for","while","do","done","case","esac","function","return","exit","export","local","echo","in"],sql:["select","from","where","join","left","right","inner","outer","on","group","by","order","having","insert","into","values","update","set","delete","create","table","alter","drop","index","and","or","not","null","as","distinct","limit","offset","union","all"],css:["color","background","margin","padding","border","display","position","width","height","font","grid","flex"],json:[],html:["div","span","button","input","form","section","header","aside","main","script","style","html","head","body"],xml:[]};
 const HL_ALIAS={js:"javascript",ts:"typescript",py:"python",yml:"yaml"};
@@ -338,7 +355,8 @@ function updateToolGroup(group){const parts=group._parts;parts.count.textContent
 function renderTimelineItem(job,item){if(item.kind==="text"){if(!job.assistant||job.toolGroupOpen){if(job.assistant)setAssistantActivity(job.assistant,"");job.assistant=addMessage("assistant","");job.assistantText="";job.toolGroupOpen=false}job.assistantText+=item.text;setAssistantText(job.assistant,job.assistantText);job.renderedText=job.latestText;return}if(item.kind==="tool"){if(item.event.kind==="tool_use"&&!job.toolGroupOpen)job.toolGroupOpen=true;addToolEvent(item.event)}}
 function resetConversation(){messages.replaceChildren();toolCards.clear();activeToolGroup=null;welcome.hidden=false;notice.textContent="";document.querySelector("#sessionTitle").textContent="New session";promptBox.value="";selectSession(null);promptBox.focus()}
 function closeSidebar(){sidebar.classList.remove("open");document.querySelector("#mobileBackdrop").classList.remove("open")}
-async function connect(){try{const s=await api("/api/state");updateWorkspace(s.workspace);document.querySelector("#composerModel").textContent=s.provider+" · "+s.model;selectSession(s.session_id);await refreshSessions()}catch(e){notice.textContent=e.message}}
+async function connect(){try{const s=await api("/api/state");updateWorkspace(s.workspace);document.querySelector("#composerModel").textContent=s.provider+" · "+s.model;selectSession(s.session_id);if(s.session_id){await loadSessionMessages(s.session_id)}await refreshSessions()}catch(e){notice.textContent=e.message}}
+async function loadSessionMessages(sessionId){try{const saved=await api("/api/session/load",{method:"POST",body:JSON.stringify({session_id:sessionId})});resetDisplayedConversation();for(const message of saved.messages){if(message.content){renderFullMessage(message.role,message.content,message.ts)}else if(message.text){addMessage(message.role,message.text,message.ts)}}document.querySelector("#sessionTitle").textContent=saved.title;promptBox.value="";}catch(e){if(handleSessionOpenError(e,sessionId))return;notice.textContent=e.message}}
 connect();
 function showFolderPickerMessage(text){folderList.replaceChildren();const message=document.createElement("div");message.className="hint";message.textContent=text;folderList.append(message)}
 function makeFolderRow(name,path,description,icon,onClick){const button=document.createElement("button");button.type="button";button.className="folder-entry";button.title=path;const glyph=document.createElement("span"),copy=document.createElement("span"),label=document.createElement("span"),detail=document.createElement("span");glyph.className="folder-entry-icon";glyph.textContent=icon;copy.className="folder-entry-copy";label.className="folder-entry-name";label.textContent=name;detail.className="folder-entry-path";detail.textContent=description;copy.append(label,detail);button.append(glyph,copy);button.onclick=onClick;return button}
@@ -356,7 +374,7 @@ document.querySelector("#useFolder").onclick=async()=>{try{const result=await ap
 document.querySelector("#closeFolder").onclick=()=>folderPicker.hidden=true;
 document.querySelector("#cancelFolder").onclick=()=>folderPicker.hidden=true;
 folderPicker.addEventListener("click",e=>{if(e.target===folderPicker)folderPicker.hidden=true});
-const settingsPicker=document.querySelector("#settingsPicker"),settingsProvider=document.querySelector("#settingsProvider"),settingsModel=document.querySelector("#settingsModel"),settingsApiKey=document.querySelector("#settingsApiKey"),settingsKeyNote=document.querySelector("#settingsKeyNote"),themePicker=document.querySelector("#themePicker");
+const settingsPicker=document.querySelector("#settingsPicker"),settingsProvider=document.querySelector("#settingsProvider"),settingsModel=document.querySelector("#settingsModel"),settingsApiKey=document.querySelector("#settingsApiKey"),settingsKeyNote=document.querySelector("#settingsKeyNote"),themePicker=document.querySelector("#themePicker"),settingsAutoDelete=document.querySelector("#settingsAutoDelete");
 let settingsData=null;
 function readStoredTheme(){try{return localStorage.getItem("clawd-theme")||"dark"}catch(e){return"dark"}}
 function applyTheme(choice){const resolved=choice==="system"?(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):choice;document.documentElement.dataset.theme=resolved;for(const button of themePicker.querySelectorAll("button"))button.classList.toggle("active",button.dataset.themeValue===choice)}
@@ -366,12 +384,13 @@ for(const button of themePicker.querySelectorAll("button"))button.onclick=()=>{t
 function fillModelOptions(){const info=settingsData.providers.find(p=>p.name===settingsProvider.value);const models=info?info.models:[];const current=info?info.default_model:"";settingsModel.replaceChildren();for(const model of models){const option=document.createElement("option");option.value=model;option.textContent=model;settingsModel.append(option)}if(current&&models.includes(current))settingsModel.value=current}
 function updateKeyNote(){const info=settingsData.providers.find(p=>p.name===settingsProvider.value);settingsKeyNote.textContent=info&&info.configured?"API key saved for "+info.label+". Paste a new one to replace it.":"No API key saved for "+(info?info.label:settingsProvider.value)+". Add one here or run `clawd login`."}
 settingsProvider.onchange=()=>{fillModelOptions();updateKeyNote()};
-async function openSettings(){try{settingsData=await api("/api/settings");settingsProvider.replaceChildren();for(const info of settingsData.providers){const option=document.createElement("option");option.value=info.name;option.textContent=info.label+(info.configured?"":" (no API key)");settingsProvider.append(option)}settingsProvider.value=settingsData.provider;fillModelOptions();if(settingsData.model&&!settingsModel.querySelector('option[value="'+CSS.escape(settingsData.model)+'"]')){const option=document.createElement("option");option.value=settingsData.model;option.textContent=settingsData.model;settingsModel.append(option)}if(settingsData.model)settingsModel.value=settingsData.model;updateKeyNote();settingsApiKey.value="";applyTheme(readStoredTheme());settingsPicker.hidden=false}catch(e){notice.textContent=e.message}}
+async function openSettings(){try{settingsData=await api("/api/settings");settingsProvider.replaceChildren();for(const info of settingsData.providers){const option=document.createElement("option");option.value=info.name;option.textContent=info.label+(info.configured?"":" (no API key)");settingsProvider.append(option)}settingsProvider.value=settingsData.provider;fillModelOptions();if(settingsData.model&&!settingsModel.querySelector('option[value="'+CSS.escape(settingsData.model)+'"]')){const option=document.createElement("option");option.value=settingsData.model;option.textContent=settingsData.model;settingsModel.append(option)}if(settingsData.model)settingsModel.value=settingsData.model;updateKeyNote();settingsApiKey.value="";applyTheme(readStoredTheme());settingsAutoDelete.checked=settingsData.auto_delete_broken_sessions!==false;settingsPicker.hidden=false}catch(e){notice.textContent=e.message}}
 document.querySelector("#openSettings").onclick=openSettings;
 document.querySelector("#closeSettings").onclick=()=>settingsPicker.hidden=true;
 document.querySelector("#cancelSettings").onclick=()=>settingsPicker.hidden=true;
 settingsPicker.addEventListener("click",e=>{if(e.target===settingsPicker)settingsPicker.hidden=true});
-document.querySelector("#saveSettings").onclick=async()=>{try{const body={provider:settingsProvider.value,model:settingsModel.value};const key=settingsApiKey.value.trim();if(key)body.api_key=key;const result=await api("/api/settings",{method:"POST",body:JSON.stringify(body)});const label=result.provider+" · "+result.model;document.querySelector("#composerModel").textContent=label;settingsPicker.hidden=true;notice.textContent="Settings saved · "+label}catch(e){notice.textContent=e.message}};
+document.querySelector("#cleanupSessions").onclick=async()=>{try{const r=await api("/api/sessions/cleanup",{method:"POST",body:"{}"});await refreshSessions();notice.textContent=r.deleted_count?("Cleaned up "+r.deleted_count+" broken chat"+(r.deleted_count===1?"":"s")+"."):"No broken chats found."}catch(e){notice.textContent=e.message}};
+document.querySelector("#saveSettings").onclick=async()=>{try{const body={provider:settingsProvider.value,model:settingsModel.value,auto_delete_broken_sessions:settingsAutoDelete.checked};const key=settingsApiKey.value.trim();if(key)body.api_key=key;const result=await api("/api/settings",{method:"POST",body:JSON.stringify(body)});const label=result.provider+" · "+result.model;document.querySelector("#composerModel").textContent=label;settingsPicker.hidden=true;notice.textContent="Settings saved · "+label;await refreshSessions()}catch(e){notice.textContent=e.message}};
 document.querySelector("#mobileNav").onclick=()=>{sidebar.classList.add("open");document.querySelector("#mobileBackdrop").classList.add("open")};
 document.querySelector("#sidebarClose").onclick=closeSidebar;
 document.querySelector("#mobileBackdrop").onclick=closeSidebar;
@@ -398,9 +417,21 @@ function streamJob(job,sessionId){let source=null,retries=0;const connect=async(
 async function pollFallback(job,sessionId){while(activeJobs.get(sessionId)===job){try{const j=await api("/api/jobs/"+job.jobId);if(applyJobState(job,sessionId,j))break}catch(e){failJob(job,sessionId,e);break}await new Promise(r=>setTimeout(r,700))}}
 async function poll(job,sessionId){streamJob(job,sessionId)}
 async function submitChatText(text){const sessionId=activeSessionId;if(!text||!sessionId||activeJobs.has(sessionId))return;promptBox.value="";notice.textContent="";stickToBottom=true;addMessage("user",text);document.querySelector("#sessionTitle").textContent=text.length>48?text.slice(0,45)+"…":text;const job={jobId:null,sessionId,latestText:"",latestActivity:"thinking",renderedText:"",renderedEvents:0,renderedTimeline:0,seq:0,assistant:addMessage("assistant",""),assistantText:"",toolGroupOpen:false,interactionId:null};activeToolGroup=null;setAssistantActivity(job.assistant,job.latestActivity);activeJobs.set(sessionId,job);setComposerBusy();try{const started=await api("/api/chat",{method:"POST",body:JSON.stringify({message:text,session_id:sessionId})});job.jobId=started.job_id;try{await refreshSessions()}catch(refreshError){notice.textContent=refreshError.message}await poll(job,sessionId)}catch(e){activeJobs.delete(sessionId);clearAllActivities();if(activeSessionId===sessionId)notice.textContent=e.message;setComposerBusy();try{await refreshSessions()}catch(refreshError){notice.textContent=refreshError.message}}}
-document.querySelector("#composer").addEventListener("submit",e=>{e.preventDefault();submitChatText(promptBox.value.trim())});
-promptBox.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.querySelector("#composer").requestSubmit()}});
-promptBox.addEventListener("input",()=>{promptBox.style.height="auto";promptBox.style.height=Math.min(promptBox.scrollHeight,180)+"px"});
+document.querySelector("#composer").addEventListener("submit",e=>{e.preventDefault();hideMention();submitChatText(promptBox.value.trim())});
+promptBox.addEventListener("keydown",e=>{if(mentionOpen()){if(e.key==="ArrowDown"){e.preventDefault();mentionMove(1);return}if(e.key==="ArrowUp"){e.preventDefault();mentionMove(-1);return}if(e.key==="Enter"||e.key==="Tab"){if(mentionChoose()){e.preventDefault();return}}if(e.key==="Escape"){e.preventDefault();hideMention();return}}if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();document.querySelector("#composer").requestSubmit()}});
+promptBox.addEventListener("input",()=>{promptBox.style.height="auto";promptBox.style.height=Math.min(promptBox.scrollHeight,180)+"px";mentionOnInput()});
+promptBox.addEventListener("click",()=>mentionOnInput());
+const mentionMenu=document.querySelector("#mentionMenu");let cmdCache=null,cmdCacheAt=0,mItems=[],mIndex=0,mToken=null;
+function mentionOpen(){return mentionMenu&&!mentionMenu.hidden}
+function hideMention(){if(mentionMenu)mentionMenu.hidden=true;mItems=[];mIndex=0;mToken=null}
+function mentionMove(d){if(!mItems.length)return;mIndex=(mIndex+d+mItems.length)%mItems.length;paintMention()}
+async function getCommands(){const now=Date.now();if(cmdCache&&now-cmdCacheAt<30000)return cmdCache;try{const r=await api("/api/commands");cmdCache=r.commands||[];cmdCacheAt=now}catch(e){cmdCache=[]}return cmdCache}
+async function getFiles(q){try{const r=await api("/api/files/search?query="+encodeURIComponent(q||""));return r.files||[]}catch(e){return[]}}
+function esc(s){return (s||"").slice(0,80)}
+function mentionOnInput(){const pos=promptBox.selectionStart||0,val=promptBox.value||"",before=val.slice(0,pos);const lineStart=before.lastIndexOf("\n")+1,line=before.slice(lineStart);let m=null;if(lineStart===0&&line[0]==="/"&&/^[^\s]*$/.test(line.slice(1)))m={type:"slash",q:line.slice(1),start:lineStart,end:pos};else{const at=before.match(/@([A-Za-z0-9_./-]{0,60})$/);if(at)m={type:"at",q:at[1]||"",start:pos-at[0].length,end:pos}}if(!m){hideMention();return}mToken=m;refreshMention()}
+async function refreshMention(){if(!mToken)return;const q=(mToken.q||"").toLowerCase();const cmds=await getCommands();let items=[];if(mToken.type==="slash"){for(const c of cmds){const n=(c.name||"").toLowerCase(),d=(c.description||"").toLowerCase();if(!q||n.includes(q)||d.includes(q))items.push({kind:c.kind==="skill"?"skill":"cmd",label:"/"+c.name,desc:c.description||"",insert:"/"+c.name+" "})}items.sort((a,b)=>(a.kind==="cmd"?0:1)-(b.kind==="cmd"?0:1)||a.label.localeCompare(b.label));items=items.slice(0,12)}else{const skills=[];for(const c of cmds){if(c.kind!=="skill")continue;const n=(c.name||"").toLowerCase();if(!q||n.includes(q))skills.push({kind:"skill",label:"@"+c.name,desc:c.description||"skill",insert:"@"+c.name+" "})}const files=await getFiles(mToken.q||"");const fitems=files.map(f=>({kind:"file",label:"@"+f.path,desc:f.name||"file",insert:"@"+f.path+" "}));items=[...skills.slice(0,6),...fitems.slice(0,8)];if(!items.length&&!q)items=skills.slice(0,8)}mItems=items;mIndex=0;paintMention()}
+function paintMention(){if(!mToken){hideMention();return}if(!mItems.length){hideMention();return}mentionMenu.replaceChildren();let lastG="";mItems.forEach((it,i)=>{const g=it.kind==="cmd"?"Commands":it.kind==="skill"?"Skills":"Files";if(g!==lastG){const h=document.createElement("div");h.className="mention-group";h.textContent=g;mentionMenu.append(h);lastG=g}const b=document.createElement("button");b.type="button";b.className="mention-item"+(i===mIndex?" active":"");const ic=document.createElement("span");ic.className="mention-icon";ic.textContent=it.kind==="cmd"?"/":it.kind==="skill"?"✦":"📄";const main=document.createElement("span");main.className="mention-main";const nm=document.createElement("span");nm.className="mention-name";nm.textContent=it.label;const ds=document.createElement("span");ds.className="mention-desc";ds.textContent=esc(it.desc);main.append(nm,ds);const kd=document.createElement("span");kd.className="mention-kind";kd.textContent=it.kind;b.append(ic,main,kd);b.onmousedown=e=>{e.preventDefault();mIndex=i;mentionChoose()};mentionMenu.append(b)});mentionMenu.hidden=false;const sel=mentionMenu.querySelector(".mention-item.active");if(sel)sel.scrollIntoView({block:"nearest"})}
+function mentionChoose(){if(!mentionOpen()||!mItems.length||!mToken)return false;const it=mItems[mIndex];const v=promptBox.value||"";const nv=v.slice(0,mToken.start)+it.insert+v.slice(mToken.end);promptBox.value=nv;promptBox.focus();try{promptBox.setSelectionRange(mToken.start+it.insert.length,mToken.start+it.insert.length)}catch(e){}hideMention();promptBox.dispatchEvent(new Event("input"));return true}
 const modelPicker=document.querySelector("#modelPicker"),modelPickerList=document.querySelector("#modelPickerList");
 function closeModelPicker(){modelPicker.hidden=true}
 async function openModelPicker(){try{const data=await api("/api/settings");modelPickerList.replaceChildren();const configured=data.providers.filter(p=>p.configured);if(!configured.length){const empty=document.createElement("div");empty.className="model-picker-empty";empty.textContent="No API keys saved yet. Add one in Settings (⚙).";modelPickerList.append(empty)}for(const info of configured){if(configured.length>1){const group=document.createElement("div");group.className="model-picker-group";group.textContent=info.label;modelPickerList.append(group)}const models=[...info.models];const currentHere=info.name===data.provider;if(currentHere&&!models.includes(data.model))models.unshift(data.model);for(const model of models){const item=document.createElement("button");item.type="button";item.className="model-picker-item"+(currentHere&&model===data.model?" active":"");const tick=document.createElement("span");tick.className="tick";tick.textContent=currentHere&&model===data.model?"✓":"";const name=document.createElement("span");name.textContent=model;item.append(tick,name);item.onclick=()=>chooseModel(info.name,model);modelPickerList.append(item)}}modelPicker.hidden=false}catch(e){notice.textContent=e.message}}
@@ -642,6 +673,158 @@ def _search_directories(
     }
 
 
+def _list_commands_for(workspace: Path) -> list[dict[str, Any]]:
+    try:
+        from src.command_surface import build_command_list
+
+        infos = build_command_list(project_root=workspace)
+        out: list[dict[str, Any]] = []
+        for info in infos:
+            out.append({
+                "name": info.name,
+                "description": info.description or "",
+                "kind": info.kind or "command",
+                "aliases": list(info.aliases or []),
+            })
+        return out
+    except Exception:
+        return []
+
+
+def _search_files(workspace: Path, query: str, limit: int = 20) -> list[dict[str, Any]]:
+    q = (query or "").strip().casefold()
+    try:
+        root = workspace.resolve(strict=True)
+    except OSError:
+        return []
+    if not root.is_dir():
+        return []
+    scored: list[tuple[int, str, str]] = []
+    visited = 0
+    for current, dirnames, filenames in os.walk(root, followlinks=False):
+        # skip heavy dirs
+        dirnames[:] = [d for d in dirnames if d not in {".git", "node_modules", "__pycache__", ".venv", "venv", ".clawd"}]
+        for fn in filenames:
+            visited += 1
+            if visited > 5000:
+                break
+            rel = str((Path(current) / fn).relative_to(root))
+            low = rel.casefold()
+            base = fn.casefold()
+            if not q:
+                score = 3
+            elif base == q or rel.casefold() == q:
+                score = 0
+            elif base.startswith(q):
+                score = 1
+            elif q in base:
+                score = 2
+            elif q in low:
+                score = 3
+            else:
+                continue
+            scored.append((score, rel.casefold(), rel))
+        if visited > 5000:
+            break
+    scored.sort(key=lambda t: (t[0], t[1]))
+    return [{"path": rel, "name": Path(rel).name} for _, _, rel in scored[:max(1, min(limit, 50))]]
+
+
+def _expand_chat_message(workspace: Path, message: str, tool_context: Any, registry: Any) -> str:
+    """Expand leading /command and @file / @skill mentions server-side.
+
+    Keeps original text and appends context so the model sees file contents
+    and skill instructions deterministically (web has no REPL pre-processing).
+    """
+    text = message or ""
+    if not text.strip():
+        return text
+    extra: list[str] = []
+    # Leading /command or /skill
+    if text.strip().startswith("/"):
+        try:
+            from src.command_surface import parse_slash
+            from src.skills.loader import find_skill
+            from src.skills.argument_substitution import substitute_arguments
+
+            parsed = parse_slash(text.strip().splitlines()[0] if "\n" in text else text.strip())
+            if parsed:
+                cname, cargs = parsed
+                skill = find_skill(cname, project_root=workspace)
+                if skill is not None and not skill.disable_model_invocation:
+                    prompt = substitute_arguments(skill.markdown_content, cargs, append_if_no_placeholder=True, argument_names=skill.arg_names)
+                    extra.append(f"[User invoked /{cname} -> skill '{skill.name}'. Follow these instructions.]\n{prompt}\nBase directory for this skill: {skill.skill_root}")
+                else:
+                    try:
+                        from src.command_surface import build_registry
+
+                        cmd = build_registry(workspace).get(cname.lower())
+                        if cmd is not None:
+                            from src.command_system.types import PromptCommand
+
+                            if isinstance(cmd, PromptCommand):
+                                from src.command_system.argument_substitution import substitute_arguments as sub2
+
+                                try:
+                                    prompt2 = sub2(cmd.markdown_content, cargs, cmd.arg_names)
+                                except Exception:
+                                    prompt2 = cmd.markdown_content.replace("$ARGUMENTS", cargs)
+                                extra.append(f"[User invoked /{cname}. Follow these instructions.]\n{prompt2}")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    # @mentions: @path/to/file, @skill:name, @skill-name (if matches skill)
+    try:
+        import re as _re
+
+        from src.skills.loader import find_skill as _find_skill
+
+        for m in _re.finditer(r"(?<!\w)@([A-Za-z0-9_./-]{2,120})", text):
+            token = m.group(1).strip().strip(",.;:!?`)]}")
+            if not token:
+                continue
+            ltok = token.lower()
+            if ltok.startswith("skill:"):
+                sname = token.split(":", 1)[1]
+                s = _find_skill(sname, project_root=workspace)
+                if s is not None and not s.disable_model_invocation:
+                    from src.skills.argument_substitution import substitute_arguments as _sub
+
+                    extra.append(f"[User attached skill @{sname}.]\n{_sub(s.markdown_content, '', append_if_no_placeholder=False, argument_names=s.arg_names)}\nBase directory: {s.skill_root}")
+                continue
+            # skill name match first (useful @)
+            s = _find_skill(token, project_root=workspace)
+            if s is not None and not s.disable_model_invocation:
+                from src.skills.argument_substitution import substitute_arguments as _sub2
+
+                extra.append(f"[User attached skill @{token}.]\n{_sub2(s.markdown_content, '', append_if_no_placeholder=False, argument_names=s.arg_names)}\nBase directory: {s.skill_root}")
+                continue
+            # file path match
+            try:
+                cand = (workspace / token).resolve()
+                wroot = workspace.resolve()
+                try:
+                    cand.relative_to(wroot)
+                except ValueError:
+                    continue
+                if cand.is_file() and cand.stat().st_size < 200_000:
+                    try:
+                        content = cand.read_text(encoding="utf-8", errors="replace")
+                        if len(content) > 12000:
+                            content = content[:12000] + "\n…(truncated)"
+                        extra.append(f"[User attached file @{token}]\n--- {token} ---\n{content}\n--- end {token} ---")
+                    except OSError:
+                        pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if extra:
+        return text + "\n\n" + "\n\n".join(extra)
+    return text
+
+
 def _change_workspace(state: _AppState, workspace: str) -> Path:
     if not workspace.strip():
         raise ValueError("path must be a non-empty directory path")
@@ -694,14 +877,106 @@ def _session_title(session: Session, fallback: str = "") -> str:
 
 def _resolve_session_workspace(session: Session, fallback: Path) -> Path:
     path = Path(session.workspace).expanduser() if session.workspace else fallback
-    resolved = path.resolve(strict=True)
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ValueError(f"Saved chat working folder no longer exists: {path} ({exc})")
     if not resolved.is_dir():
         raise ValueError(f"Saved chat working folder is not a directory: {resolved}")
     session.workspace = str(resolved)
     return resolved
 
 
+def _auto_delete_broken_sessions_enabled() -> bool:
+    """Whether broken sessions (missing working folder) should be auto-deleted.
+
+    Config: ~/.clawd/config.json -> {"web": {"auto_delete_broken_sessions": bool}}
+    Defaults to True so stale chats never pile up in the sidebar.
+    """
+    try:
+        from src.config import load_config
+
+        config = load_config()
+        web_cfg = config.get("web", {})
+        if isinstance(web_cfg, dict) and "auto_delete_broken_sessions" in web_cfg:
+            return bool(web_cfg["auto_delete_broken_sessions"])
+        if "auto_delete_broken_sessions" in config:
+            return bool(config["auto_delete_broken_sessions"])
+    except Exception:
+        pass
+    return True
+
+
+def _session_workspace_missing(session: Session) -> bool:
+    """True when the session points at a working folder that no longer exists."""
+    if not session.workspace:
+        return False
+    try:
+        path = Path(session.workspace).expanduser()
+    except (OSError, RuntimeError, ValueError):
+        return True
+    try:
+        return not path.exists() or not path.is_dir()
+    except (OSError, ValueError):
+        return True
+
+
+def _delete_session_file(session_id: str) -> bool:
+    """Delete one saved chat file. Returns True when a file was removed."""
+    try:
+        session_file = Path.home() / ".clawd" / "sessions" / f"{session_id}.json"
+        session_file.unlink()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+
+
+def _cleanup_broken_session_files() -> list[str]:
+    """Delete saved chats whose working folder is gone. Returns deleted ids."""
+    if not _auto_delete_broken_sessions_enabled():
+        return []
+    session_dir = Path.home() / ".clawd" / "sessions"
+    if not session_dir.exists():
+        return []
+    deleted: list[str] = []
+    for session_file in session_dir.glob("*.json"):
+        if not _SESSION_ID_PATTERN.fullmatch(session_file.stem):
+            continue
+        try:
+            session = Session.load(session_file.stem)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            # Corrupt files are hidden by _saved_sessions but not deleted here;
+            # deleting them could hide real bugs, so leave them alone.
+            continue
+        if session is None:
+            continue
+        if _session_workspace_missing(session):
+            if _delete_session_file(session.session_id):
+                deleted.append(session.session_id)
+    return deleted
+
+
+def _session_has_running_job_safe(state: _AppState | None, session_id: str) -> bool:
+    """Non-locking check used while listing sessions (best-effort)."""
+    if state is None:
+        return False
+    try:
+        with state.lock:
+            jobs = list(state.jobs.values())
+    except Exception:
+        return False
+    return any(
+        job.session_id == session_id and job.status in {"running", "waiting"}
+        for job in jobs
+    )
+
+
 def _saved_sessions(state: _AppState | None = None) -> list[Session]:
+    # Broken sessions (working folder deleted, e.g. a Temp dir) must never
+    # show in the web app. Optionally auto-delete them from disk.
+    auto_delete = _auto_delete_broken_sessions_enabled()
     session_dir = Path.home() / ".clawd" / "sessions"
     sessions_by_id: dict[str, Session] = {}
     if session_dir.exists():
@@ -713,8 +988,14 @@ def _saved_sessions(state: _AppState | None = None) -> list[Session]:
             except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
                 # A truncated or corrupt file must not hide the other saved chats.
                 continue
-            if session is not None:
-                sessions_by_id[session.session_id] = session
+            if session is None:
+                continue
+            if _session_workspace_missing(session):
+                # Never list it; delete the file when auto-delete is on.
+                if auto_delete and not _session_has_running_job_safe(state, session.session_id):
+                    _delete_session_file(session.session_id)
+                continue
+            sessions_by_id[session.session_id] = session
     running_prompts: dict[str, str] = {}
     if state is not None:
         with state.lock:
@@ -745,6 +1026,46 @@ def _session_transcript(session: Session) -> list[dict[str, str]]:
         if text:
             transcript.append({"role": message.role, "text": text, "ts": message.timestamp})
     return transcript
+
+
+def _session_full_messages(session: Session) -> list[dict[str, Any]]:
+    """Return full message data including tool blocks for session restoration."""
+    messages = []
+    for message in session.conversation.messages:
+        if message.role not in {"user", "assistant"} or message._is_internal:
+            continue
+        if isinstance(message.content, str):
+            messages.append({
+                "role": message.role,
+                "text": message.content,
+                "ts": message.timestamp,
+            })
+        else:
+            # Full content with tool blocks
+            content_blocks = []
+            for block in message.content:
+                if isinstance(block, TextContentBlock):
+                    content_blocks.append({"type": "text", "text": block.text})
+                elif isinstance(block, ToolUseContentBlock):
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    })
+                elif isinstance(block, ToolResultContentBlock):
+                    content_blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.tool_use_id,
+                        "content": block.content,
+                        "is_error": block.is_error,
+                    })
+            messages.append({
+                "role": message.role,
+                "content": content_blocks,
+                "ts": message.timestamp,
+            })
+    return messages
 
 
 def _truncate_conversation_for_retry(
@@ -1175,6 +1496,7 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     "providers": providers,
                     "provider": current_provider,
                     "model": current_model,
+                    "auto_delete_broken_sessions": _auto_delete_broken_sessions_enabled(),
                 })
                 return
             if path == "/api/sessions":
@@ -1226,6 +1548,28 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     self._json(400, {"error": f"Could not search folders: {exc}"})
                     return
                 self._json(200, results)
+                return
+            if path == "/api/commands":
+                try:
+                    with state.lock:
+                        ws = state.workspace
+                    cmds = _list_commands_for(ws)
+                except Exception as exc:
+                    self._json(500, {"error": str(exc)})
+                    return
+                self._json(200, {"commands": cmds})
+                return
+            if path == "/api/files/search":
+                params = parse_qs(urlsplit(self.path).query)
+                query = params.get("query", [""])[0]
+                try:
+                    with state.lock:
+                        ws = state.workspace
+                    files = _search_files(ws, query, limit=20)
+                except Exception as exc:
+                    self._json(500, {"error": str(exc)})
+                    return
+                self._json(200, {"files": files})
                 return
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["api", "jobs"] and parts[3] == "stream":
@@ -1317,9 +1661,9 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
             return payload
 
         def do_POST(self) -> None:
+            path = urlsplit(self.path).path
             if not self._check_auth():
                 return
-            path = urlsplit(self.path).path
             payload = self._read_json()
             if payload is None:
                 return
@@ -1395,23 +1739,79 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                             state.default_workspace or state.workspace,
                         )
                     except (OSError, RuntimeError, ValueError) as exc:
+                        if _auto_delete_broken_sessions_enabled() and not _session_has_running_job(state, session_id):
+                            _delete_session_file(session_id)
+                            state.sessions.pop(session_id, None)
+                            self._json(410, {
+                                "error": f"This chat was automatically deleted because its working folder no longer exists: {exc}",
+                                "auto_deleted": True,
+                                "workspace_missing": True,
+                                "session_id": session_id,
+                            })
+                            return
                         self._json(400, {"error": f"Could not use this chat's working folder: {exc}"})
                         return
                     state.sessions[session_id] = session
                     tool_context = ToolContext(workspace_root=session_workspace)
-                    job = _Job(
-                        job_id=uuid.uuid4().hex,
-                        session_id=session_id,
-                        session=session,
-                        tool_context=tool_context,
-                        prompt=message.strip(),
-                        message_added=True,
-                    )
-                    session.conversation.add_user_message(message.strip())
+
+                    # Handle skill commands (e.g., /customize-clawd list) + @file/@skill expansion
+                    skill_prompt = None
+                    stripped_msg = message.strip()
+                    expanded_msg = stripped_msg
+                    try:
+                        expanded_msg = _expand_chat_message(session_workspace, stripped_msg, tool_context, state.registry)
+                    except Exception:
+                        expanded_msg = stripped_msg
+                    if stripped_msg.startswith("/"):
+                        try:
+                            from src.command_surface import parse_slash as _parse_slash
+                            from src.command_surface import run_skill_tool as _run_skill_tool
+
+                            parsed = _parse_slash(stripped_msg)
+                        except Exception:
+                            parsed = None
+                        if parsed:
+                            skill_name, skill_args = parsed
+                            # Check if it's a known skill (not a built-in command)
+                            built_in_names = {c.lstrip("/").lower() for c in ["/help", "/exit", "/quit", "/model", "/mcp", "/resume", "/rewind", "/context", "/compact", "/init", "/tools", "/skills", "/skill-create", "/skill-install", "/skill-list", "/skill-remove", "/cost", "/login", "/config", "/doctor"]}
+                            if skill_name.lower() not in built_in_names:
+                                try:
+                                    skill_result = _run_skill_tool(skill_name, skill_args, state.registry, tool_context)
+                                    if skill_result and hasattr(skill_result, 'output') and isinstance(skill_result.output, dict):
+                                        payload = skill_result.output
+                                        if payload.get("success") and payload.get("prompt"):
+                                            skill_prompt = payload["prompt"]
+                                            # Add user message for the skill command
+                                            session.conversation.add_user_message(stripped_msg)
+                                except Exception:
+                                    pass  # Fall through to normal chat
+
+                    if skill_prompt:
+                        # Skill was executed, send the skill's prompt to the LLM
+                        job = _Job(
+                            job_id=uuid.uuid4().hex,
+                            session_id=session_id,
+                            session=session,
+                            tool_context=tool_context,
+                            prompt=skill_prompt,
+                            message_added=True,
+                        )
+                        # Note: skill already added user message above
+                    else:
+                        # Normal chat (with @file / @skill / /command context expanded)
+                        job = _Job(
+                            job_id=uuid.uuid4().hex,
+                            session_id=session_id,
+                            session=session,
+                            tool_context=tool_context,
+                            prompt=expanded_msg,
+                            message_added=True,
+                        )
+                        session.conversation.add_user_message(expanded_msg)
                     state.jobs[job.job_id] = job
                 thread = threading.Thread(
                     target=_run_job,
-                    args=(state, job, message.strip()),
+                    args=(state, job, job.prompt),
                     daemon=True,
                     name=f"clawd-web-{job.job_id[:8]}",
                 )
@@ -1435,6 +1835,7 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                 if not isinstance(session_id, str) or not _SESSION_ID_PATTERN.fullmatch(session_id):
                     self._json(400, {"error": "session_id must be a valid saved session ID"})
                     return
+                auto_deleted = False
                 with state.lock:
                     try:
                         session = state.sessions.get(session_id) or Session.load(session_id)
@@ -1450,7 +1851,23 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                             state.default_workspace or state.workspace,
                         )
                     except (OSError, RuntimeError, ValueError) as exc:
-                        self._json(400, {"error": f"Could not open saved chat working folder: {exc}"})
+                        # Working folder is gone (e.g. deleted Temp dir).
+                        # Auto-delete so it never shows again, when enabled.
+                        if _auto_delete_broken_sessions_enabled() and not _session_has_running_job(state, session_id):
+                            _delete_session_file(session_id)
+                            state.sessions.pop(session_id, None)
+                            auto_deleted = True
+                        self._json(410, {
+                            "error": (
+                                "This chat was automatically deleted because its working folder "
+                                f"no longer exists: {exc}"
+                                if auto_deleted else
+                                f"Could not open saved chat working folder: {exc}"
+                            ),
+                            "auto_deleted": auto_deleted,
+                            "workspace_missing": True,
+                            "session_id": session_id,
+                        })
                         return
                     state.workspace = session_workspace
                     state.session = session
@@ -1460,7 +1877,55 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     "session_id": session.session_id,
                     "title": _session_title(session),
                     "workspace": str(session_workspace),
-                    "messages": _session_transcript(session),
+                    "messages": _session_full_messages(session),
+                })
+                return
+            if path == "/api/sessions/cleanup":
+                # Manual + automatic cleanup: delete saved chats whose working
+                # folder no longer exists. Running chats are never deleted.
+                with state.lock:
+                    running_ids = {
+                        job.session_id
+                        for job in state.jobs.values()
+                        if job.status in {"running", "waiting"}
+                    }
+                    cached = list(state.sessions.items())
+                deleted: list[str] = []
+                skipped_broken: list[str] = []
+                session_dir = Path.home() / ".clawd" / "sessions"
+                if session_dir.exists():
+                    for session_file in session_dir.glob("*.json"):
+                        if not _SESSION_ID_PATTERN.fullmatch(session_file.stem):
+                            continue
+                        if session_file.stem in running_ids:
+                            continue
+                        try:
+                            session = Session.load(session_file.stem)
+                        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+                            continue
+                        if session is None:
+                            continue
+                        if _session_workspace_missing(session):
+                            if _delete_session_file(session.session_id):
+                                deleted.append(session.session_id)
+                            else:
+                                skipped_broken.append(session.session_id)
+                with state.lock:
+                    for session_id in deleted:
+                        state.sessions.pop(session_id, None)
+                    # Also drop broken in-memory-only sessions (never saved).
+                    for session_id, session in cached:
+                        if session_id in running_ids:
+                            continue
+                        if _session_workspace_missing(session):
+                            state.sessions.pop(session_id, None)
+                            if session_id not in deleted:
+                                skipped_broken.append(session_id)
+                self._json(200, {
+                    "ok": True,
+                    "deleted": deleted,
+                    "deleted_count": len(deleted),
+                    "skipped_running_or_undeletable": skipped_broken,
                 })
                 return
             if path == "/api/session/delete":
@@ -1546,6 +2011,29 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                 model = payload.get("model")
                 api_key = payload.get("api_key")
                 base_url = payload.get("base_url")
+                auto_delete_raw = payload.get("auto_delete_broken_sessions", None)
+                # Auto-delete toggle can be saved on its own.
+                if auto_delete_raw is not None and not isinstance(auto_delete_raw, bool):
+                    self._json(400, {"error": "auto_delete_broken_sessions must be a boolean"})
+                    return
+                if auto_delete_raw is not None:
+                    try:
+                        config = load_config()
+                        web_cfg = config.setdefault("web", {})
+                        web_cfg["auto_delete_broken_sessions"] = bool(auto_delete_raw)
+                        save_config(config)
+                    except (OSError, ValueError) as exc:
+                        self._json(400, {"error": f"Could not save settings: {exc}"})
+                        return
+                    # If this was only a toggle (no provider/model change), return now.
+                    if provider_name is None and model is None and api_key is None and base_url is None:
+                        self._json(200, {
+                            "ok": True,
+                            "provider": state.provider_name,
+                            "model": state.provider.model,
+                            "auto_delete_broken_sessions": bool(auto_delete_raw),
+                        })
+                        return
                 if provider_name is not None and (
                     not isinstance(provider_name, str) or provider_name not in PROVIDER_INFO
                 ):
@@ -1619,6 +2107,7 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     "ok": True,
                     "provider": selected_provider,
                     "model": selected_model,
+                    "auto_delete_broken_sessions": _auto_delete_broken_sessions_enabled(),
                 })
                 return
             parts = path.strip("/").split("/")

@@ -969,14 +969,25 @@ def _run_agent_loop_impl(
 
             conversation.add_assistant_message(assistant_blocks if assistant_blocks else "")
         else:
-            # Persist assistant text for session history features like /render-last
-            # and for subsequent non-Anthropic turns seeded from conversation.
-            conversation.add_assistant_message(final_assistant_content)
-            # Add assistant message to OpenAI messages (text only)
+            # Persist assistant text and tool calls for session history
+            assistant_blocks: list = []
+            if response.content:
+                assistant_blocks.append(TextContentBlock(type="text", text=response.content))
+
+            tool_uses = response.tool_uses or []
+            for tool_use in tool_uses:
+                assistant_blocks.append(ToolUseContentBlock(
+                    type="tool_use",
+                    id=tool_use["id"],
+                    name=tool_use["name"],
+                    input=tool_use["input"],
+                ))
+
+            conversation.add_assistant_message(assistant_blocks if assistant_blocks else final_assistant_content)
+
+            # Add assistant message to OpenAI messages (text + tool_calls)
             openai_assistant_msg: dict[str, Any] = {"role": "assistant", "content": final_assistant_content}
-            # If there are tool_uses, add them in OpenAI format
             if response.tool_uses:
-                # Build OpenAI tool_calls
                 tool_calls = []
                 for tu in response.tool_uses:
                     tool_calls.append({
@@ -1082,6 +1093,8 @@ def _run_agent_loop_impl(
                 if _is_anthropic_provider(provider):
                     conversation.add_tool_result_message(tool_id, result_output)
                 else:
+                    # Add tool result to conversation (for session persistence)
+                    conversation.add_tool_result_message(tool_id, result_output)
                     # Add tool result in OpenAI format
                     openai_messages.append({
                         "role": "tool",
@@ -1112,6 +1125,8 @@ def _run_agent_loop_impl(
                 if _is_anthropic_provider(provider):
                     conversation.add_tool_result_message(tool_id, error_str, is_error=True)
                 else:
+                    # Add tool result to conversation (for session persistence)
+                    conversation.add_tool_result_message(tool_id, error_str, is_error=True)
                     openai_messages.append({
                         "role": "tool",
                         "tool_call_id": tool_id,

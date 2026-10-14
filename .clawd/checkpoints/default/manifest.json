@@ -22,5 +22,29 @@
     "created": "2026-10-13T21:58:46",
     "label": "#0003 .demo-audit-web.md (new file)",
     "new_file": true
+  },
+  "4": {
+    "n": 4,
+    "relpath": "test_web_explore.py",
+    "flat": "test_web_explore.py",
+    "created": "2026-10-13T23:27:23",
+    "label": "#0004 test_web_explore.py (new file)",
+    "new_file": true
+  },
+  "5": {
+    "n": 5,
+    "relpath": "src/web_app.py",
+    "flat": "src__web_app.py",
+    "created": "2026-10-14T00:00:40",
+    "label": "#0005 src/web_app.py",
+    "new_file": false
+  },
+  "6": {
+    "n": 6,
+    "relpath": "src/web_app.py",
+    "flat": "src__web_app.py",
+    "created": "2026-10-14T00:01:10",
+    "label": "#0006 src/web_app.py",
+    "new_file": false
   }
 }

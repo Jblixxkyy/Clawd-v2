@@ -83,15 +83,21 @@ def _load_all_into(registry: SkillRegistry, *, project_root, user_skills_dir) ->
 
     if project_root is not None:
         pr = Path(project_root).expanduser().resolve()
-        proj_dirs = []
-        main_path = pr / ".clawd" / "skills"
-        compat_path = pr / ".claude" / "skills"
-        proj_dirs.append(main_path)
-        if compat_path != main_path:
-            proj_dirs.append(compat_path)
-        for pr_dir in proj_dirs:
-            for s in load_skills_from_dir(pr_dir, loaded_from="project"):
-                registry.register(s)
+        # Walk from filesystem root down to pr so repo-owned
+        # .clawd/skills are picked up even when cwd is a subdir.
+        # Farthest ancestor first (lowest precedence), nearest last.
+        chain: list[Path] = []
+        cur: Path | None = pr
+        while cur is not None:
+            chain.append(cur)
+            nxt = cur.parent
+            if nxt == cur:
+                break
+            cur = nxt
+        for ancestor in reversed(chain):
+            for pr_dir in (ancestor / ".clawd" / "skills", ancestor / ".claude" / "skills"):
+                for s in load_skills_from_dir(pr_dir, loaded_from="project"):
+                    registry.register(s)
 
 
 def clear_skill_registry() -> None:

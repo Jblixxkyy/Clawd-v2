@@ -29,6 +29,7 @@ Examples:
   clawd config             Show current configuration
   clawd web                Start the browser app for this workspace
   clawd web --reload       Restart the browser app automatically after source edits
+  clawd web --kill         Stop all Clawd web apps running on this computer
   clawd --no-stream      Start REPL without live response rendering
   clawd                    Start interactive REPL
 """
@@ -121,6 +122,8 @@ Examples:
         return show_config()
     elif args.command == 'web':
         if args.kill:
+            if args.reload or args._reload_worker:
+                parser.error('web --kill cannot be combined with --reload')
             from src.web_app import kill_web_apps
 
             summary = kill_web_apps(port=args.port)

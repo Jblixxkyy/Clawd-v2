@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+from dataclasses import dataclass
 from typing import Any
 
 from ..context import ToolContext
@@ -9,11 +10,16 @@ from ..permission_handler import PermissionResult
 from ..protocol import ToolResult
 from ..diff_utils import unified_diff_hunks
 from ..registry import ToolSpec
+from .edit_fuzzy import resolve_match
 
 
 # ---------------------------------------------------------------------------
 # Edit hardening (Q10): expected_occurrences validation, nearest-match hints,
 # and an atomic multi-hunk mode so one tool call can do N replacements.
+#
+# Fuzzy fallback (brief 013): when the exact search finds nothing, a short
+# confidence-gated chain (line-trim -> indent -> collapse-ws -> near) may locate
+# the text anyway. Ambiguity still raises; short needles never enter the chain.
 # ---------------------------------------------------------------------------
 
 def _line_number(content: str, index: int) -> int:
@@ -70,17 +76,61 @@ def _format_lines(lines: list[int], limit: int = 10) -> str:
     return shown
 
 
-def _validate_replacement(
+def _not_found_error(content: str, old: str, path_display: str) -> ToolInputError:
+    """The classic 'not found' error, with nearest-match hints when we have any."""
+    msg = f"old_string not found in '{path_display}' (0 occurrences)."
+    hints = _nearest_match_hints(content, old)
+    if hints:
+        msg += "\nDid you mean one of these?\n" + "\n".join(f"  {h}" for h in hints)
+    else:
+        msg += " Check the exact text (whitespace included) or read the file again."
+    return ToolInputError(msg)
+
+
+def _all_spans(content: str, old: str) -> list[tuple[int, int]]:
+    """Every ``[start, end)`` span where *old* occurs in *content*."""
+    spans: list[tuple[int, int]] = []
+    start = 0
+    step = max(len(old), 1)
+    while True:
+        i = content.find(old, start)
+        if i == -1:
+            break
+        spans.append((i, i + len(old)))
+        start = i + step
+    return spans
+
+
+def _span_lines(content: str, spans: list[tuple[int, int]]) -> str:
+    return _format_lines([_line_number(content, s) for s, _ in spans])
+
+
+@dataclass
+class _Resolution:
+    """Where to edit: ``spans`` are offsets into the ORIGINAL content."""
+
+    strategy: str
+    spans: list[tuple[int, int]]
+    adjust_indent: bool
+    count: int
+
+    @property
+    def exact(self) -> bool:
+        return self.strategy == "exact"
+
+
+def _resolve_replacement(
     content: str,
     old: str,
     replace_all: bool,
     expected_occurrences: Any,
     path_display: str,
-) -> int:
-    """Validate one replacement against *content*; return occurrence count.
+) -> _Resolution:
+    """Resolve *old* against *content* to a set of spans; raise when unusable.
 
-    Raises ToolInputError with a specific, actionable message when the
-    search string is missing, ambiguous, or violates *expected_occurrences*.
+    Exact matches first — byte-identical behaviour to the pre-013 tool. Only
+    when the exact search finds nothing does the fuzzy chain get a turn, and it
+    must produce a unique match (or be explicitly told ``replace_all``).
     """
     if not isinstance(old, str) or not old:
         raise ToolInputError("old_string must be a non-empty string")
@@ -92,32 +142,93 @@ def _validate_replacement(
         raise ToolInputError("expected_occurrences must be a non-negative integer")
 
     count = content.count(old)
-    lines = _occurrence_lines(content, old) if count else []
 
-    if count == 0:
-        msg = f"old_string not found in '{path_display}' (0 occurrences)."
-        hints = _nearest_match_hints(content, old)
-        if hints:
-            msg += "\nDid you mean one of these?\n" + "\n".join(f"  {h}" for h in hints)
-        else:
-            msg += " Check the exact text (whitespace included) or read the file again."
-        raise ToolInputError(msg)
+    if count:
+        lines = _occurrence_lines(content, old)
+        if expected_occurrences is not None and count != expected_occurrences:
+            raise ToolInputError(
+                f"expected_occurrences={expected_occurrences} but found {count} "
+                f"occurrence{'s' if count != 1 else ''} of old_string in "
+                f"'{path_display}' (lines {_format_lines(lines)})."
+            )
+        if count > 1 and not replace_all and expected_occurrences is None:
+            raise ToolInputError(
+                f"old_string is not unique in '{path_display}': found {count} "
+                f"occurrences (lines {_format_lines(lines)}). Provide a larger "
+                f"old_string, set replace_all=true, or pass "
+                f"expected_occurrences={count} to replace a specific count."
+            )
+        return _Resolution("exact", _all_spans(content, old), False, count)
 
-    if expected_occurrences is not None and count != expected_occurrences:
+    # Exact search came up empty: this is the ONLY path into the fuzzy chain.
+    if expected_occurrences == 0:
+        raise _not_found_error(content, old, path_display)
+
+    match = resolve_match(content, old)
+    if match is None:
+        raise _not_found_error(content, old, path_display)
+
+    spans = list(match.spans)
+    if expected_occurrences is not None and len(spans) != expected_occurrences:
         raise ToolInputError(
-            f"expected_occurrences={expected_occurrences} but found {count} "
-            f"occurrence{'s' if count != 1 else ''} of old_string in "
-            f"'{path_display}' (lines {_format_lines(lines)})."
+            f"expected_occurrences={expected_occurrences} but fuzzy-matched "
+            f"{len(spans)} occurrence{'s' if len(spans) != 1 else ''} of old_string "
+            f"in '{path_display}' (lines {_span_lines(content, spans)})."
         )
-
-    if count > 1 and not replace_all and expected_occurrences is None:
+    if len(spans) > 1 and not replace_all:
         raise ToolInputError(
-            f"old_string is not unique in '{path_display}': found {count} "
-            f"occurrences (lines {_format_lines(lines)}). Provide a larger "
-            f"old_string, set replace_all=true, or pass "
-            f"expected_occurrences={count} to replace a specific count."
+            f"fuzzy match for old_string is not unique in '{path_display}': found "
+            f"{len(spans)} near-matches (lines {_span_lines(content, spans)}). "
+            f"Provide a larger old_string, set replace_all=true, or pass "
+            f"expected_occurrences={len(spans)}."
         )
-    return count
+    return _Resolution(match.strategy, spans, match.adjust_indent, len(spans))
+
+
+def _apply_spans(content: str, spans: list[tuple[int, int]], new: str, adjust_indent: bool) -> str:
+    """Splice *new* into *content* at *spans* (spans must be sorted, non-overlapping).
+
+    ``adjust_indent`` drops ``new``'s leading whitespace: the span starts after
+    the file's own indentation, so re-inserting the model's indentation would
+    double it. The file keeps the indentation it already had.
+    """
+    if adjust_indent:
+        new = new.lstrip(" \t")
+    out: list[str] = []
+    prev = 0
+    for s, e in spans:
+        out.append(content[prev:s])
+        out.append(new)
+        prev = e
+    out.append(content[prev:])
+    return "".join(out)
+
+
+def _selected_spans(res: _Resolution, replace_all: bool, expected_occurrences: Any) -> list[tuple[int, int]]:
+    """Spans this call actually rewrites (mirrors the original replace() rules)."""
+    if replace_all or (expected_occurrences is not None and expected_occurrences > 1):
+        return res.spans
+    return res.spans[:1]
+
+
+def _match_info(res: _Resolution, content: str) -> dict[str, Any]:
+    """Structured record of how (and where) the text was found — see brief 013."""
+    s, e = res.spans[0]
+    return {
+        "kind": "exact" if res.exact else "fuzzy",
+        "strategy": res.strategy,
+        "foundLine": _line_number(content, s),
+        "found": content[s:e],
+    }
+
+
+def _fuzzy_notice(res: _Resolution, content: str) -> str:
+    if res.exact:
+        return ""
+    return (
+        f"Matched fuzzily ({res.strategy}, line {_line_number(content, res.spans[0][0])}) "
+        "\u2014 the file's own text was used as-is."
+    )
 
 
 def _check_hunk(hunk: Any, index: int) -> dict[str, Any]:
@@ -243,13 +354,10 @@ class FileEditTool:
         replace_all = bool(tool_input.get("replace_all", False))
         expected = tool_input.get("expected_occurrences")
 
-        count = _validate_replacement(original, old, replace_all, expected, display)
-        if replace_all or (expected is not None and expected > 1):
-            updated = original.replace(old, new)
-            replaced = count
-        else:
-            updated = original.replace(old, new, 1)
-            replaced = 1
+        res = _resolve_replacement(original, old, replace_all, expected, display)
+        use = _selected_spans(res, replace_all, expected)
+        updated = _apply_spans(original, use, new, res.adjust_indent)
+        replaced = len(use)
 
         hunks = self._write_and_diff(path, original, updated, context)
         return ToolResult(
@@ -258,12 +366,14 @@ class FileEditTool:
                 "filePath": str(path),
                 "oldString": old,
                 "newString": new,
-                "occurrences": count,
+                "occurrences": res.count,
                 "replaced": replaced,
                 "originalFile": original,
                 "structuredPatch": hunks,
                 "userModified": False,
                 "replaceAll": bool(replace_all),
+                "match": _match_info(res, original),
+                **({"notice": _fuzzy_notice(res, original)} if not res.exact else {}),
             },
         )
 
@@ -281,9 +391,10 @@ class FileEditTool:
             raise ToolInputError("'edits' must be a non-empty array of {old_string, new_string} hunks")
         hunks = [_check_hunk(h, i) for i, h in enumerate(edits)]
 
-        # Phase 1: validate every hunk against the ORIGINAL content.
-        counts = [
-            _validate_replacement(
+        # Phase 1: resolve every hunk against the ORIGINAL content (exact, or
+        # fuzzy where unique). Any failure leaves the file untouched.
+        resolutions = [
+            _resolve_replacement(
                 original,
                 h["old_string"],
                 h["replace_all"],
@@ -293,18 +404,34 @@ class FileEditTool:
             for h in hunks
         ]
 
-        # Phase 2: apply in order to a working copy, then write once.
+        # Phase 2: splice every selected span in one pass, writing once.
+        plan: list[tuple[int, int, str, bool]] = []
+        selected: list[list[tuple[int, int]]] = []
+        for h, res in zip(hunks, resolutions):
+            use = _selected_spans(res, h["replace_all"], h["expected_occurrences"])
+            selected.append(use)
+            for s, e in use:
+                plan.append((s, e, h["new_string"], res.adjust_indent))
+
+        plan.sort(key=lambda item: item[0])
+        for prev, cur in zip(plan, plan[1:]):
+            if cur[0] < prev[1]:
+                raise ToolInputError(
+                    "edits overlap: two hunks target the same region of "
+                    f"'{display}' (offsets {prev[0]}-{prev[1]} and {cur[0]}-{cur[1]}). "
+                    "Merge them into one hunk."
+                )
+
         updated = original
-        replaced_counts: list[int] = []
-        for h, count in zip(hunks, counts):
-            if h["replace_all"] or (h["expected_occurrences"] is not None and h["expected_occurrences"] > 1):
-                updated = updated.replace(h["old_string"], h["new_string"])
-                replaced_counts.append(count)
-            else:
-                updated = updated.replace(h["old_string"], h["new_string"], 1)
-                replaced_counts.append(1)
+        for s, e, new_text, adjust in reversed(plan):
+            updated = _apply_spans(updated, [(s, e)], new_text, adjust)
 
         patch_hunks = self._write_and_diff(path, original, updated, context)
+        notices = [
+            _fuzzy_notice(res, original)
+            for res, use in zip(resolutions, selected)
+            if not res.exact and use
+        ]
         return ToolResult(
             name="Edit",
             output={
@@ -313,14 +440,16 @@ class FileEditTool:
                     {
                         "oldString": h["old_string"],
                         "newString": h["new_string"],
-                        "occurrences": c,
-                        "replaced": r,
+                        "occurrences": res.count,
+                        "replaced": len(use),
                         "replaceAll": h["replace_all"],
+                        "match": _match_info(res, original),
                     }
-                    for h, c, r in zip(hunks, counts, replaced_counts)
+                    for h, res, use in zip(hunks, resolutions, selected)
                 ],
                 "originalFile": original,
                 "structuredPatch": patch_hunks,
                 "userModified": False,
+                **({"notice": "; ".join(notices)} if notices else {}),
             },
         )

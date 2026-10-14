@@ -637,7 +637,10 @@ class ClawdREPL:
             self._show_slash_palette(query or None)
             return
         if selected:
-            self.handle_command(selected)
+            # collect_palette_items embeds aliases as "/name (aliases: ...)"
+            # – strip to the invocable name before dispatch.
+            invocable = selected.split(" (aliases:", 1)[0].strip()
+            self.handle_command(invocable)
 
     def _show_slash_palette(self, query: str | None = None) -> None:
         q = (query or "").strip().lower()
@@ -847,10 +850,26 @@ class ClawdREPL:
             self._open_command_center()
             return
         if raw.startswith("/") and " " not in raw and raw.lower() not in (c.lower() for c in self._built_in_commands):
-            query = raw[1:]
-            if query:
-                self._open_command_center(query=query)
-                return
+            # "_built_in_commands" does NOT contain skills – without this guard
+            # selecting "/<skill>" from the picker re-opens the picker with
+            # query="<skill>" (looks like a flash / no-op). Only treat as a
+            # filter query when it doesn't resolve to a known command/skill.
+            try:
+                from src.command_surface import build_command_list
+
+                cwd = self.tool_context.cwd or self.tool_context.workspace_root
+                infos = build_command_list(project_root=cwd)
+                known = {f"/{info.name.lower()}" for info in infos}
+                for info in infos:
+                    for a in info.aliases:
+                        known.add(f"/{a.lower()}")
+            except Exception:
+                known = set()
+            if raw.lower() not in known:
+                query = raw[1:]
+                if query:
+                    self._open_command_center(query=query)
+                    return
 
         # First, try the shared command surface
         if raw.startswith("/"):

@@ -82,7 +82,9 @@ _TOOL_GUIDANCE: dict[str, str] = {
         "- Edit replaces the exact text in old_string with new_string, and the "
         "values must differ. old_string must occur exactly once; include more "
         "surrounding context to make it unique. A checkpoint snapshot is taken "
-        "before every edit."
+        "before every edit. If exact text is not found, a short fuzzy fallback "
+        "(whitespace/indentation drift) may still match -- but keep sending the "
+        "exact text you read; do not rely on it."
     ),
     "enterplanmode": (
         "- Plan mode: for complex or multi-step tasks, call EnterPlanMode first to "
