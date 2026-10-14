@@ -13,6 +13,8 @@ layer. This module renders only the dynamic/conditional parts:
   status, platform, and tmp preference.
 - ``build_skills_section``: the live skill inventory, so the model answers
   from real state instead of guessing from the tool roster.
+- ``build_mcp_section``: the live MCP server inventory (one terse line per
+  server plus cheap resource URIs); "" when no servers are connected.
 - ``build_agent_guidelines``: legacy entry point, now only the Windows-only
   shell section (kept for backwards compatibility).
 """
@@ -82,9 +84,7 @@ _TOOL_GUIDANCE: dict[str, str] = {
         "- Edit replaces the exact text in old_string with new_string, and the "
         "values must differ. old_string must occur exactly once; include more "
         "surrounding context to make it unique. A checkpoint snapshot is taken "
-        "before every edit. If exact text is not found, a short fuzzy fallback "
-        "(whitespace/indentation drift) may still match -- but keep sending the "
-        "exact text you read; do not rely on it."
+        "before every edit."
     ),
     "enterplanmode": (
         "- Plan mode: for complex or multi-step tasks, call EnterPlanMode first to "
@@ -295,4 +295,71 @@ def build_skills_section(tool_context: "ToolContext") -> str:
     lines.append("Assistant: I have 2 skills:")
     lines.append("- /deploy: deploys the app to production")
     lines.append("- /debug: helps debug failing tests")
+    return "\n".join(lines)
+
+
+def _mcp_tool_entry(item) -> tuple[str, str | None]:
+    """Normalize one ``list_tools()`` item to ``(name, description-or-None)``.
+
+    The client protocol declares ``list_tools() -> list[str]`` (names only),
+    so most entries carry no description -- never invent one. Tolerate richer
+    items opportunistically in case a client returns dicts with descriptions.
+    """
+    if isinstance(item, dict):
+        name = str(item.get("name") or "").strip()
+        desc = item.get("description")
+        desc = " ".join(str(desc).split()) if desc else None
+        return name, (desc or None)
+    return str(item).strip(), None
+
+
+def build_mcp_section(tool_context: "ToolContext") -> str:
+    """Render the live MCP server inventory as an '## MCP Servers' section.
+
+    Prompt-diet: returns "" when no servers are connected -- only injects
+    when there is an inventory to show. The MCP tool stays registered either
+    way; the empty state carries no block and raises no error.
+
+    One terse line per server (``- <server>: <tool1>, <tool2>``), since
+    ``list_tools()`` yields names only and descriptions must not be
+    invented. Resource URIs are listed where the client cheaply exposes
+    ``list_resources()``. A failing server never breaks the whole block.
+    """
+    clients = getattr(tool_context, "mcp_clients", None) or {}
+    if not clients:
+        return ""
+    lines = [
+        "## MCP Servers",
+        "Call a tool on a connected server with the MCP tool:",
+        '  {"server": "<name>", "tool": "<tool>", "input": {...}}',
+        "Only the servers and tools listed below exist -- do not invent others.",
+    ]
+    for name in sorted(clients, key=lambda n: str(n).lower()):
+        client = clients[name]
+        tools: list[str] = []
+        try:
+            raw = client.list_tools()
+        except Exception:
+            raw = None
+        if isinstance(raw, list):
+            for item in raw:
+                tool_name, tool_desc = _mcp_tool_entry(item)
+                if not tool_name:
+                    continue
+                tools.append(f"{tool_name} ({tool_desc})" if tool_desc else tool_name)
+        lines.append(f"- {name}: {', '.join(tools) if tools else '(tool list unavailable)'}")
+        list_res = getattr(client, "list_resources", None)
+        if callable(list_res):
+            try:
+                resources = list_res()
+            except Exception:
+                resources = None
+            if isinstance(resources, list):
+                uris = [
+                    str(r.get("uri", "")).strip()
+                    for r in resources
+                    if isinstance(r, dict) and str(r.get("uri", "")).strip()
+                ]
+                if uris:
+                    lines.append(f"  resources: {', '.join(uris)}")
     return "\n".join(lines)
