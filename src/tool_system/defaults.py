@@ -45,13 +45,16 @@ from .tools import (
     TaskUpdateTool,
     TestingPermissionTool,
     TodoWriteTool,
+    CompleteTaskTool,
+    ReportFailureTool,
+    ExitTool,
     WebFetchTool,
     WebSearchTool,
     SubagentOutputTool,
     SubagentTool,
 )
-from .tools.browser import BROWSER_TOOLS
 from .tools.agent import AgentTool
+from .tools.browser import BROWSER_TOOLS
 from .tools.tool_search import ToolSearchTool
 
 
@@ -78,6 +81,12 @@ def build_default_registry(*, include_user_tools: bool = True) -> ToolRegistry:
             BriefTool(),
             AskUserQuestionTool(),
             TodoWriteTool(),
+            # Brief 020: hard termination protocol — complete_task is the
+            # only terminal success path; ReportFailure the typed failure
+            # exit; Exit the low-level isComplete signal.
+            CompleteTaskTool(),
+            ReportFailureTool(),
+            ExitTool(),
             TaskCreateTool(),
             TaskGetTool(),
             TaskListTool(),

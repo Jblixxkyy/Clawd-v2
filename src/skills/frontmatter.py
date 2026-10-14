@@ -6,7 +6,8 @@ from typing import Any, Dict, List, Tuple
 
 # Keys where "a, b, c" means a list. Everything else (notably `description`)
 # stays a plain string, since descriptions routinely contain commas.
-_COMMA_LIST_KEYS = {"allowed-tools", "arguments", "paths"}
+_COMMA_LIST_KEYS = {"allowed-tools", "arguments", "paths",
+                      "triggers", "markers"}  # 030: relevance loading
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,8 @@ from .agent import AgentTool
 from .ask_user_question import AskUserQuestionTool
 from .bash import BashTool
 from .brief import BriefTool
+from .browser import BROWSER_TOOLS
+from .complete_task import CompleteTaskTool
 from .config import ConfigTool
 from .cron import CronCreateTool, CronDeleteTool, CronListTool
 from .edit import FileEditTool
@@ -14,21 +16,33 @@ from .lsp import LSPTool
 from .mcp import MCPTool
 from .mcp_resources import ListMcpResourcesTool, ReadMcpResourceTool
 from .misc import NotebookEditTool, PowerShellTool, REPLTool, RemoteTriggerTool, SendMessageTool, TestingPermissionTool
-from .plan_mode import EnterPlanModeTool, ExitPlanModeTool
+from .plan_mode import (
+    EnterPlanModeTool,
+    EnterPlanModeV2,
+    ExitPlanModeTool,
+    ExitPlanModeV2,
+)
 from .read import FileReadTool
+from .scaffold import (
+    ExitTool,
+    ReportFailureTool,
+    ToolFailure,
+    evaluate_run_end,
+    is_terminal_result,
+)
 from .send_user_message import SendUserMessageTool
 from .sleep import SleepTool
 from .skill import SkillTool
 from .structured_output import StructuredOutputTool
 from .subagent import SubagentOutputTool, SubagentTool
 from .team import TeamCreateTool, TeamDeleteTool
+from .think import ThinkEvent, ThinkTool
 from .task_stop import TaskStopTool
 from .tasks_v2 import TaskCreateTool, TaskGetTool, TaskListTool, TaskOutputTool, TaskUpdateTool
 from .todo_write import TodoWriteTool
 from .tool_search import ToolSearchTool
 from .web_fetch import WebFetchTool
 from .web_search import WebSearchTool
-from .browser import BROWSER_TOOLS
 from .worktree import EnterWorktreeTool, ExitWorktreeTool
 from .write import FileWriteTool
 
@@ -37,14 +51,19 @@ __all__ = [
     "AskUserQuestionTool",
     "BashTool",
     "BriefTool",
+    "BROWSER_TOOLS",
     "ConfigTool",
     "CronCreateTool",
     "CronDeleteTool",
     "DelegateAgentTool",
     "CronListTool",
+    "CompleteTaskTool",
     "EnterPlanModeTool",
+    "EnterPlanModeV2",
     "EnterWorktreeTool",
     "ExitPlanModeTool",
+    "ExitPlanModeV2",
+    "ExitTool",
     "ExitWorktreeTool",
     "FileEditTool",
     "FileReadTool",
@@ -55,6 +74,8 @@ __all__ = [
     "MCPTool",
     "ListMcpResourcesTool",
     "ReadMcpResourceTool",
+    "ReportFailureTool",
+    "ToolFailure",
     "NotebookEditTool",
     "PowerShellTool",
     "REPLTool",
@@ -73,11 +94,11 @@ __all__ = [
     "TaskListTool",
     "TaskOutputTool",
     "TaskStopTool",
+    "ThinkTool",
     "TaskUpdateTool",
     "TestingPermissionTool",
     "TodoWriteTool",
     "ToolSearchTool",
     "WebFetchTool",
     "WebSearchTool",
-    "BROWSER_TOOLS",
 ]
