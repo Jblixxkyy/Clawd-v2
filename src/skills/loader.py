@@ -83,21 +83,15 @@ def _load_all_into(registry: SkillRegistry, *, project_root, user_skills_dir) ->
 
     if project_root is not None:
         pr = Path(project_root).expanduser().resolve()
-        # Walk from filesystem root down to pr so repo-owned
-        # .clawd/skills are picked up even when cwd is a subdir.
-        # Farthest ancestor first (lowest precedence), nearest last.
-        chain: list[Path] = []
-        cur: Path | None = pr
-        while cur is not None:
-            chain.append(cur)
-            nxt = cur.parent
-            if nxt == cur:
-                break
-            cur = nxt
-        for ancestor in reversed(chain):
-            for pr_dir in (ancestor / ".clawd" / "skills", ancestor / ".claude" / "skills"):
-                for s in load_skills_from_dir(pr_dir, loaded_from="project"):
-                    registry.register(s)
+        proj_dirs = []
+        main_path = pr / ".clawd" / "skills"
+        compat_path = pr / ".claude" / "skills"
+        proj_dirs.append(main_path)
+        if compat_path != main_path:
+            proj_dirs.append(compat_path)
+        for pr_dir in proj_dirs:
+            for s in load_skills_from_dir(pr_dir, loaded_from="project"):
+                registry.register(s)
 
 
 def clear_skill_registry() -> None:
@@ -173,6 +167,11 @@ def load_skills_from_dir(base_dir: str | Path, *, loaded_from: str = "skills") -
         paths = _as_str_list(fm.get("paths"))
         if paths == []:
             paths = None
+        # 030: relevance-shaped loading fields
+        triggers = _as_str_list(fm.get("triggers"))
+        markers = _as_str_list(fm.get("markers"))
+        context_cmd = fm.get("context_cmd")
+        context_cmd = str(context_cmd).strip() if context_cmd else None
 
         skill = PromptSkill(
             name=skill_name,
@@ -193,6 +192,9 @@ def load_skills_from_dir(base_dir: str | Path, *, loaded_from: str = "skills") -
             effort=effort,
             paths=paths,
             markdown_content=body,
+            triggers=triggers,
+            markers=markers,
+            context_cmd=context_cmd,
         )
         skills.append(skill)
     return skills
