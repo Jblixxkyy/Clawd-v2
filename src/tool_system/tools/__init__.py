@@ -28,6 +28,7 @@ from .todo_write import TodoWriteTool
 from .tool_search import ToolSearchTool
 from .web_fetch import WebFetchTool
 from .web_search import WebSearchTool
+from .browser import BROWSER_TOOLS
 from .worktree import EnterWorktreeTool, ExitWorktreeTool
 from .write import FileWriteTool
 
@@ -78,4 +79,5 @@ __all__ = [
     "ToolSearchTool",
     "WebFetchTool",
     "WebSearchTool",
+    "BROWSER_TOOLS",
 ]

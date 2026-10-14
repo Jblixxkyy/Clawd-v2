@@ -49,6 +49,47 @@ def _default_skill_dirs() -> list[Path]:
     return dirs
 
 
+def _default_config_dirs() -> list[Path]:
+    """Clawd config roots the AI is allowed to manage (mcp.json etc)."""
+    import os
+
+    dirs: list[Path] = []
+    try:
+        _c = (Path.home() / ".clawd").expanduser().resolve()
+        dirs.append(_c)
+    except Exception:
+        pass
+    return dirs
+
+
+def is_managed_skill_path(path: Path) -> bool:
+    """True when path is a SKILL.md inside any known skill root."""
+    try:
+        rp = Path(path).expanduser().resolve()
+    except Exception:
+        return False
+    if rp.name != "SKILL.md":
+        return False
+    parts = {p.lower() for p in rp.parts}
+    if "managed_skills" in parts:
+        return True
+    # .../.clawd/skills/<name>/SKILL.md or .../.claude/skills/<name>/SKILL.md
+    for i, p in enumerate([x.lower() for x in rp.parts]):
+        if p in {".clawd", ".claude"} and i + 1 < len(rp.parts) and rp.parts[i + 1].lower() == "skills":
+            return True
+    # Any globally-known skill root
+    try:
+        for root in _default_skill_dirs():
+            try:
+                rp.relative_to(root)
+                return True
+            except ValueError:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 @dataclass
 class ToolContext:
     workspace_root: Path
@@ -118,15 +159,16 @@ class ToolContext:
         # "path is outside allowed working directories".
         # Per-skill whitelisting also happens in SkillTool.run for any
         # custom location; this covers discovery without a Skill call.
+        # Global skill roots are whitelisted even when missing so the AI can
+        # CREATE new skills (Write needs an allowed parent). ~/.clawd is
+        # whitelisted so the AI can manage mcp.json.
         try:
-            for _d in _default_skill_dirs():
+            for _d in _default_skill_dirs() + _default_config_dirs():
                 if _d not in self.permission_context.additional_working_directories:
-                    # Only add existing dirs to keep allowed_roots() clean.
-                    if _d.exists() and _d.is_dir():
-                        self.permission_context.additional_working_directories = (
-                            *self.permission_context.additional_working_directories,
-                            _d,
-                        )
+                    self.permission_context.additional_working_directories = (
+                        *self.permission_context.additional_working_directories,
+                        _d,
+                    )
             # Repo-owned skills: .clawd/skills / .claude/skills in workspace
             # or any ancestor (repo root while cwd is a subdir). Whitelist
             # existing ones so Read/Glob work even when ancestor is outside

@@ -72,7 +72,7 @@ _HTML = r"""<!doctype html>
 html[data-theme="light"]{color-scheme:light;--bg:#f7f7f8;--sidebar:#efeff1;--line:#e2e2e5;--text:#1f2023;--muted:#6b6d72;--subtle:#eaeaee;--hover:#e4e4e9;--accent:#3b3d42;--warning:#8a6d1a;--danger:#c62828;--panel:#ffffff;--border:#dcdce1;--code-bg:#f0f0f3;--code-fg:#3a3a40;--link:#2f5fd0;--green:#1a7f4b;--blue:#2456c9;--purple:#7a3fc5;--amber:#8a6b12;--danger-soft:#fdecec;--warn-bg:#fdf6e3;--warn-border:#e6d5a8;--hover-strong:#d7d7de;--btn-primary-bg:#1f2023;--btn-primary-fg:#ffffff;--diff-add-bg:#e3f5e9;--diff-add-fg:#1a7f4b;--diff-del-bg:#fdecec;--diff-del-fg:#c62828}
 *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
-.app-shell{display:grid;grid-template-columns:244px minmax(0,1fr);width:100%;height:100dvh;overflow:hidden}
+.app-shell{display:grid;grid-template-columns:244px minmax(0,1fr) auto;width:100%;height:100dvh;overflow:hidden}
 .sidebar{display:flex;flex-direction:column;min-width:0;padding:12px 10px;background:var(--sidebar);border-right:1px solid var(--line)}
 .brand-row{height:34px;display:flex;align-items:center;gap:9px;padding:0 8px 10px;font-size:14px;font-weight:600;letter-spacing:-.2px}
 .brand-mark{display:grid;place-items:center;width:21px;height:21px;border-radius:6px;background:var(--btn-primary-bg);color:var(--btn-primary-fg);font-size:13px;font-weight:700}
@@ -87,7 +87,7 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 .chevron{color:var(--muted);font-size:12px}.sessions-label{margin-top:24px}
 .session-list{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow:auto}
 .session-item{display:flex;align-items:center;gap:5px;min-height:32px;padding:3px 5px 3px 9px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:12px}
-.session-item:hover{color:var(--text)}.session-item.active{background:var(--hover-strong);color:var(--text)}.session-open{flex:1;min-width:0;overflow:hidden;padding:3px 0;border:0;background:transparent;text-align:left;color:inherit}.session-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.session-state{flex:none;color:var(--green);font-size:10px}.session-cost{flex:none;color:var(--muted);font-size:10px}.session-delete{flex:none;padding:2px 5px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:14px;line-height:1}.session-delete:hover{background:var(--danger-soft);color:var(--danger)}.sessions-empty{padding:3px 9px;color:var(--muted);font-size:11px}
+.session-item:hover{color:var(--text)}.session-item.active{background:var(--hover-strong);color:var(--text)}.session-open{flex:1;min-width:0;overflow:hidden;padding:3px 0;border:0;background:transparent;text-align:left;color:inherit}.session-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.session-state{flex:none;color:var(--green);font-size:10px}.session-spinner{flex:none;width:11px;height:11px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--green);animation:session-spin .8s linear infinite}@keyframes session-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.session-spinner{animation:none;border-color:var(--green);opacity:.6}}.session-cost{flex:none;color:var(--muted);font-size:10px}.session-delete{flex:none;padding:2px 5px;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:14px;line-height:1}.session-delete:hover{background:var(--danger-soft);color:var(--danger)}.sessions-empty{padding:3px 9px;color:var(--muted);font-size:11px}
 .sidebar-spacer{flex:1}.sidebar-footer{display:flex;flex-direction:column;gap:7px;padding:10px 6px 2px;border-top:1px solid var(--line)}
 .change-folder{padding:5px 0;border:0;background:transparent;text-align:left;color:var(--muted);font-size:11px}.change-folder:hover{color:var(--text)}
 .footer-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.footer-row .change-folder{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -236,6 +236,49 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 .mobile-backdrop{display:none}
 @media(max-width:760px){.app-shell{grid-template-columns:minmax(0,1fr)}.sidebar{position:fixed;inset:0 auto 0 0;z-index:6;width:min(82vw,280px);transform:translateX(-102%);transition:transform .18s ease;box-shadow:8px 0 30px #00000012}.sidebar.open{transform:translateX(0)}.sidebar-close{display:block;margin-left:auto;width:26px;height:26px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:17px}.mobile-nav{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:16px}.mobile-nav:hover{background:var(--hover)}.topbar{justify-content:flex-start;padding:0 12px}.mobile-backdrop.open{display:block;position:fixed;inset:0;z-index:5;background:#0005}.welcome{padding-top:clamp(64px,14vh,120px)}#messages{padding:24px 15px}.composer-zone{padding-right:14px;padding-left:14px}.notice{padding-right:15px;padding-left:15px}}
 @media(max-width:420px){.welcome-brand{font-size:28px}.starter-prompts{gap:6px}.starter{font-size:10px}.breadcrumb{gap:5px}}
+/* Managed browser sidebar (VSCode Simple Browser style, collapsible) */
+.browser-panel{position:relative;display:flex;flex-direction:column;min-height:0;width:400px;border-left:1px solid var(--line);background:var(--sidebar)}
+.browser-panel[hidden]{display:none}
+.browser-resize{position:absolute;top:0;bottom:0;left:-3px;width:6px;cursor:col-resize;z-index:3}
+.browser-resize:hover,.browser-resize.dragging{background:var(--link)}
+.browser-head{display:flex;flex:none;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.browser-title{font-size:12px;font-weight:600;letter-spacing:.02em}
+.browser-pill{padding:3px 10px;border:1px solid var(--border);border-radius:20px;background:var(--subtle);color:var(--muted);font-size:11px}
+.browser-pill:hover{color:var(--text);background:var(--hover-strong)}
+.browser-pill.held{border-color:var(--amber);color:var(--amber)}
+.browser-head .browser-nav{margin-left:auto}
+.browser-toolbar{display:flex;flex:none;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.browser-nav{display:grid;flex:none;place-items:center;width:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px;background:var(--panel);font-size:13px}
+.browser-nav:hover{background:var(--hover-strong);color:var(--text)}
+.browser-nav.active{border-color:var(--link);color:var(--link)}
+.browser-url{flex:1;min-width:0;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--code-bg);color:var(--text);font-size:12px}
+.browser-view{position:relative;flex:1;min-height:0;overflow:auto;background:#000;outline:none}
+.browser-view:focus-visible{box-shadow:inset 0 0 0 1px var(--link)}
+.browser-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;color:var(--muted);font-size:12px;text-align:center}
+.browser-empty[hidden]{display:none}
+.browser-empty span{font-size:11px;opacity:.8}
+.browser-shot{display:block;width:100%;height:auto;cursor:default}
+.browser-shot[hidden]{display:none}
+.browser-shot.picking{cursor:crosshair}
+.browser-highlight{position:absolute;z-index:2;border:2px solid #ff4444;background:#ff444422;pointer-events:none}
+.browser-highlight[hidden]{display:none}
+.browser-loading{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:#00000055}
+.browser-loading[hidden]{display:none}
+.browser-loading span{width:22px;height:22px;border:2px solid var(--muted);border-top-color:var(--text);border-radius:50%;animation:browser-spin .7s linear infinite}
+@keyframes browser-spin{to{transform:rotate(360deg)}}
+.browser-statusbar{display:flex;flex:none;align-items:center;gap:7px;min-height:28px;padding:4px 10px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}
+.browser-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.browser-dot.user{background:var(--green)}
+.browser-dot.agent{background:var(--blue)}
+#browserWho{flex:none;font-weight:600;color:var(--text)}
+.browser-url-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.browser-comment{flex:none;padding:10px;border-top:1px solid var(--line)}
+.browser-comment[hidden]{display:none}
+.browser-comment textarea{width:100%;min-height:56px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--code-bg);color:var(--text);font-size:12px;resize:vertical}
+.browser-comment-row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+#browserToggle.active{color:var(--text);background:var(--hover-strong)}
+@media(max-width:760px){.browser-panel{position:fixed;top:0;right:0;bottom:0;z-index:9;width:min(420px,100vw);box-shadow:-8px 0 30px #0008}.browser-resize{display:none}}
+
 </style>
 </head>
 <body>
@@ -253,7 +296,7 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 <div class="sidebar-footer"><div class="footer-row"><button class="change-folder" id="changeFolder" type="button">New chat in another folder</button><button class="gear-button" id="openSettings" type="button" aria-label="Settings" title="Settings">⚙</button></div></div>
 </aside>
 <div class="main-column">
-<header class="topbar"><button class="mobile-nav" id="mobileNav" type="button" aria-label="Open navigation">☰</button><div class="breadcrumb"><span id="topProject">Workspace</span><span class="crumb-separator">/</span><strong id="sessionTitle">New session</strong></div><div class="topbar-right"><button class="topbar-action" id="exportChat" type="button" title="Export chat as markdown" aria-label="Export chat as markdown">⤓</button></div></header>
+<header class="topbar"><button class="mobile-nav" id="mobileNav" type="button" aria-label="Open navigation">☰</button><div class="breadcrumb"><span id="topProject">Workspace</span><span class="crumb-separator">/</span><strong id="sessionTitle">New session</strong></div><div class="topbar-right"><button class="topbar-action" id="browserToggle" type="button" title="Toggle browser panel" aria-label="Toggle browser panel"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.2"/><ellipse cx="8" cy="8" rx="2.8" ry="6.2"/><line x1="1.8" y1="8" x2="14.2" y2="8"/><line x1="3.2" y1="4.6" x2="12.8" y2="4.6"/><line x1="3.2" y1="11.4" x2="12.8" y2="11.4"/></svg></button><button class="topbar-action" id="exportChat" type="button" title="Export chat as markdown" aria-label="Export chat as markdown">⤓</button></div></header>
 <section class="conversation">
 <div class="conversation-scroll" id="conversationScroll">
 <div class="welcome" id="welcome"><div class="welcome-brand">Clawd</div><p class="welcome-subtitle">What are we building today?</p><div class="starter-prompts"><button class="starter" type="button" data-prompt="Explain this codebase">Explain this codebase</button><button class="starter" type="button" data-prompt="Help me find a bug">Help me find a bug</button><button class="starter" type="button" data-prompt="Build a new feature">Build a new feature</button></div></div>
@@ -264,6 +307,14 @@ button,input,textarea{font:inherit}button{color:inherit;cursor:pointer}button:di
 <div class="composer-zone"><form id="composer"><div class="composer-card"><div class="mention-menu" id="mentionMenu" hidden></div><textarea id="prompt" placeholder="Ask anything about this project…  ( / for commands · @ for files & skills )" rows="2"></textarea><div class="composer-toolbar"><button class="composer-model" id="composerModel" type="button" title="Change provider and model"></button><span class="composer-actions"><button class="stop-button" id="stop" type="button" hidden aria-label="Stop response"><span class="stop-icon"></span></button><button class="send-button" id="send" type="submit" aria-label="Send message">↑</button></span></div></div><div class="composer-hint">Enter to send · Shift+Enter for a new line</div></form></div>
 </section>
 </div>
+<aside class="browser-panel" id="browserPanel" hidden aria-label="Managed browser">
+<div class="browser-resize" id="browserResize" title="Drag to resize"></div>
+<div class="browser-head"><span class="browser-title">Browser</span><button class="browser-pill" id="browserControlToggle" type="button" title="Toggle who may drive the browser">Shared</button><button class="browser-nav" id="browserCollapse" type="button" title="Collapse browser panel" aria-label="Collapse browser panel">»</button></div>
+<div class="browser-toolbar"><button class="browser-nav" id="browserBack" type="button" title="Back" aria-label="Back">←</button><button class="browser-nav" id="browserForward" type="button" title="Forward" aria-label="Forward">→</button><button class="browser-nav" id="browserReload" type="button" title="Reload" aria-label="Reload">⟳</button><input class="browser-url" id="browserUrl" type="text" placeholder="https://…" aria-label="Browser URL" autocomplete="off" spellcheck="false"><button class="browser-nav" id="browserPicker" type="button" title="Select an element to comment on - While the page has focus Ctrl+Shift+C" aria-label="Select an element to comment on">⌖</button></div>
+<div class="browser-view" id="browserView" tabindex="0" aria-label="Browser page view. Focus here for Ctrl+Shift+C element picker."><div class="browser-empty" id="browserEmpty">No page open yet.<span>Enter a URL above, or let the agent open one.</span></div><img class="browser-shot" id="browserShot" alt="Browser page screenshot" hidden><div class="browser-highlight" id="browserHighlight" hidden></div><div class="browser-loading" id="browserLoading" hidden><span></span></div></div>
+<div class="browser-statusbar"><span class="browser-dot" id="browserDot"></span><span id="browserWho">Idle</span><span class="browser-url-text" id="browserCurrentUrl"></span></div>
+<div class="browser-comment" id="browserComment" hidden><div class="hint" id="browserCommentTarget"></div><textarea id="browserCommentText" placeholder="Comment on this element..." aria-label="Comment on this element"></textarea><div class="browser-comment-row"><button class="secondary-button" id="browserCommentCancel" type="button">Cancel</button><button class="primary-button" id="browserCommentSubmit" type="button">Send to agent</button></div></div>
+</aside>
 </div>
 <section class="folder-picker" id="folderPicker" hidden>
 <div class="folder-dialog" role="dialog" aria-modal="true" aria-labelledby="folderTitle"><div class="folder-heading"><span id="folderTitle">Start a new chat in a working folder</span><button class="folder-close" id="closeFolder" type="button" aria-label="Close folder picker">×</button></div>
@@ -332,7 +383,7 @@ function selectSession(sessionId){activeSessionId=sessionId;for(const item of do
 async function refreshSessions(){try{const result=await api("/api/sessions");lastSessions=result.sessions||[]}catch(e){return}renderSessionList()}
 function dropBrokenSession(sessionId,wasAutoDeleted){lastSessions=lastSessions.filter(s=>s.session_id!==sessionId);renderSessionList();if(wasAutoDeleted)notice.textContent="That chat was automatically deleted because its working folder no longer exists."}
 function handleSessionOpenError(e,sessionId){const p=e&&e.payload||{};if(e&&e.code===410||p.workspace_missing||p.auto_deleted){dropBrokenSession(sessionId,!!p.auto_deleted);refreshSessions().catch(()=>{});if(!p.auto_deleted)notice.textContent=e.message;return true}return false}
-function renderSessionList(){const list=document.querySelector("#sessionsList");const q=(sessionSearch.value||"").trim().toLowerCase();const sessions=q?lastSessions.filter(s=>(s.title||"").toLowerCase().includes(q)):lastSessions;list.replaceChildren();if(!sessions.length){const empty=document.createElement("div");empty.className="sessions-empty";empty.textContent=q?"No chats match":"No saved chats";list.append(empty);return}for(const session of sessions){const row=document.createElement("div");row.className="session-item";row.dataset.sessionId=session.session_id;const open=document.createElement("button");open.type="button";open.className="session-open";open.title=session.title;const title=document.createElement("span");title.className="session-title";title.textContent=session.title;open.append(title);open.onclick=()=>openSavedSession(session.session_id);row.append(open);const renameBtn=document.createElement("button");renameBtn.type="button";renameBtn.className="session-rename";renameBtn.textContent="\u270e";renameBtn.title="Rename chat";renameBtn.setAttribute("aria-label","Rename chat: "+session.title);renameBtn.onclick=e=>{e.stopPropagation();startSessionRename(row,session)};row.append(renameBtn);if(typeof session.session_cost_usd==="number"&&session.session_cost_usd>0){const scost=document.createElement("span");scost.className="session-cost";scost.textContent="$"+session.session_cost_usd.toFixed(4);scost.title="Session spend";row.append(scost)}if(session.running||activeJobs.has(session.session_id)){const status=document.createElement("span");status.className="session-state";status.textContent="Running";status.title="Chat is running";row.append(status)}const remove=document.createElement("button");remove.type="button";remove.className="session-delete";remove.textContent="×";remove.title="Delete saved chat";remove.setAttribute("aria-label","Delete saved chat: "+session.title);remove.disabled=session.running||activeJobs.has(session.session_id);remove.onclick=()=>deleteSavedSession(session.session_id);row.append(remove);if(session.session_id===activeSessionId)row.classList.add("active");list.append(row)}}
+function renderSessionList(){const list=document.querySelector("#sessionsList");const q=(sessionSearch.value||"").trim().toLowerCase();const sessions=q?lastSessions.filter(s=>(s.title||"").toLowerCase().includes(q)):lastSessions;list.replaceChildren();if(!sessions.length){const empty=document.createElement("div");empty.className="sessions-empty";empty.textContent=q?"No chats match":"No saved chats";list.append(empty);return}for(const session of sessions){const row=document.createElement("div");row.className="session-item";row.dataset.sessionId=session.session_id;const open=document.createElement("button");open.type="button";open.className="session-open";open.title=session.title;const title=document.createElement("span");title.className="session-title";title.textContent=session.title;open.append(title);open.onclick=()=>openSavedSession(session.session_id);row.append(open);const renameBtn=document.createElement("button");renameBtn.type="button";renameBtn.className="session-rename";renameBtn.textContent="\u270e";renameBtn.title="Rename chat";renameBtn.setAttribute("aria-label","Rename chat: "+session.title);renameBtn.onclick=e=>{e.stopPropagation();startSessionRename(row,session)};row.append(renameBtn);if(typeof session.session_cost_usd==="number"&&session.session_cost_usd>0){const scost=document.createElement("span");scost.className="session-cost";scost.textContent="$"+session.session_cost_usd.toFixed(4);scost.title="Session spend";row.append(scost)}if(session.running||activeJobs.has(session.session_id)){const status=document.createElement("span");status.className="session-spinner";status.title="Chat is running";status.setAttribute("role","status");status.setAttribute("aria-label","Chat is running");row.append(status)}const remove=document.createElement("button");remove.type="button";remove.className="session-delete";remove.textContent="×";remove.title="Delete saved chat";remove.setAttribute("aria-label","Delete saved chat: "+session.title);remove.disabled=session.running||activeJobs.has(session.session_id);remove.onclick=()=>deleteSavedSession(session.session_id);row.append(remove);if(session.session_id===activeSessionId)row.classList.add("active");list.append(row)}}
 function resetDisplayedConversation(){messages.replaceChildren();toolCards.clear();activeToolGroup=null;welcome.hidden=true;document.querySelector("#interaction")?.remove()}
 function restoreRunningJob(sessionId){const running=activeJobs.get(sessionId);if(!running)return;running.renderedText="";running.renderedEvents=0;running.assistant=null;running.interactionId=null;running.assistant=addMessage("assistant","");if(running.latestText){setAssistantText(running.assistant,running.latestText);running.renderedText=running.latestText}running.assistantText=running.latestText||"";setAssistantActivity(running.assistant,running.latestActivity);const pending=running.pendingDeltas||[];running.pendingDeltas=[];for(const d of pending){if(d.kind==="text"||d.kind==="tool")running.renderedTimeline++;if(d.kind!=="text")renderDelta(running,sessionId,d)}}
 async function openSavedSession(sessionId){try{const saved=await api("/api/session/load",{method:"POST",body:JSON.stringify({session_id:sessionId})});updateSessionWorkspace(saved.workspace);resetDisplayedConversation();for(const message of saved.messages){if(message.content){renderFullMessage(message.role,message.content,message.ts)}else if(message.text){addMessage(message.role,message.text,message.ts)}}document.querySelector("#sessionTitle").textContent=saved.title;promptBox.value="";selectSession(saved.session_id);restoreRunningJob(saved.session_id);notice.textContent=activeJobs.has(saved.session_id)?"This chat is running in the background. You can keep working in another chat.":"";closeSidebar()}catch(e){if(handleSessionOpenError(e,sessionId))return;notice.textContent=e.message}}
@@ -427,10 +478,12 @@ function hideMention(){if(mentionMenu)mentionMenu.hidden=true;mItems=[];mIndex=0
 function mentionMove(d){if(!mItems.length)return;mIndex=(mIndex+d+mItems.length)%mItems.length;paintMention()}
 async function getCommands(){const now=Date.now();if(cmdCache&&now-cmdCacheAt<30000)return cmdCache;try{const r=await api("/api/commands");cmdCache=r.commands||[];cmdCacheAt=now}catch(e){cmdCache=[]}return cmdCache}
 async function getFiles(q){try{const r=await api("/api/files/search?query="+encodeURIComponent(q||""));return r.files||[]}catch(e){return[]}}
+let mcpCache=null,mcpCacheAt=0;
+async function getMCPs(){const now=Date.now();if(mcpCache&&now-mcpCacheAt<30000)return mcpCache;try{const r=await api("/api/mcp");mcpCache=r.servers||[]}catch(e){mcpCache=[]}mcpCacheAt=now;return mcpCache}
 function esc(s){return (s||"").slice(0,80)}
 function mentionOnInput(){const pos=promptBox.selectionStart||0,val=promptBox.value||"",before=val.slice(0,pos);const lineStart=before.lastIndexOf("\n")+1,line=before.slice(lineStart);let m=null;if(lineStart===0&&line[0]==="/"&&/^[^\s]*$/.test(line.slice(1)))m={type:"slash",q:line.slice(1),start:lineStart,end:pos};else{const at=before.match(/@([A-Za-z0-9_./-]{0,60})$/);if(at)m={type:"at",q:at[1]||"",start:pos-at[0].length,end:pos}}if(!m){hideMention();return}mToken=m;refreshMention()}
-async function refreshMention(){if(!mToken)return;const q=(mToken.q||"").toLowerCase();const cmds=await getCommands();let items=[];if(mToken.type==="slash"){for(const c of cmds){const n=(c.name||"").toLowerCase(),d=(c.description||"").toLowerCase();if(!q||n.includes(q)||d.includes(q))items.push({kind:c.kind==="skill"?"skill":"cmd",label:"/"+c.name,desc:c.description||"",insert:"/"+c.name+" "})}items.sort((a,b)=>(a.kind==="cmd"?0:1)-(b.kind==="cmd"?0:1)||a.label.localeCompare(b.label));items=items.slice(0,12)}else{const skills=[];for(const c of cmds){if(c.kind!=="skill")continue;const n=(c.name||"").toLowerCase();if(!q||n.includes(q))skills.push({kind:"skill",label:"@"+c.name,desc:c.description||"skill",insert:"@"+c.name+" "})}const files=await getFiles(mToken.q||"");const fitems=files.map(f=>({kind:"file",label:"@"+f.path,desc:f.name||"file",insert:"@"+f.path+" "}));items=[...skills.slice(0,6),...fitems.slice(0,8)];if(!items.length&&!q)items=skills.slice(0,8)}mItems=items;mIndex=0;paintMention()}
-function paintMention(){if(!mToken){hideMention();return}if(!mItems.length){hideMention();return}mentionMenu.replaceChildren();let lastG="";mItems.forEach((it,i)=>{const g=it.kind==="cmd"?"Commands":it.kind==="skill"?"Skills":"Files";if(g!==lastG){const h=document.createElement("div");h.className="mention-group";h.textContent=g;mentionMenu.append(h);lastG=g}const b=document.createElement("button");b.type="button";b.className="mention-item"+(i===mIndex?" active":"");const ic=document.createElement("span");ic.className="mention-icon";ic.textContent=it.kind==="cmd"?"/":it.kind==="skill"?"✦":"📄";const main=document.createElement("span");main.className="mention-main";const nm=document.createElement("span");nm.className="mention-name";nm.textContent=it.label;const ds=document.createElement("span");ds.className="mention-desc";ds.textContent=esc(it.desc);main.append(nm,ds);const kd=document.createElement("span");kd.className="mention-kind";kd.textContent=it.kind;b.append(ic,main,kd);b.onmousedown=e=>{e.preventDefault();mIndex=i;mentionChoose()};mentionMenu.append(b)});mentionMenu.hidden=false;const sel=mentionMenu.querySelector(".mention-item.active");if(sel)sel.scrollIntoView({block:"nearest"})}
+async function refreshMention(){if(!mToken)return;const q=(mToken.q||"").toLowerCase();const cmds=await getCommands();const mcps=await getMCPs();const mcpItems=mcps.filter(s=>!q||(s.name||"").toLowerCase().includes(q)).map(s=>({kind:"mcp",label:"@mcp:"+s.name,desc:(s.command||"")+(s.args&&s.args.length?" "+s.args.join(" "):"")||"MCP server",insert:"@mcp:"+s.name+" "}));let items=[];if(mToken.type==="slash"){for(const c of cmds){const n=(c.name||"").toLowerCase(),d=(c.description||"").toLowerCase();if(!q||n.includes(q)||d.includes(q))items.push({kind:c.kind==="skill"?"skill":"cmd",label:"/"+c.name,desc:c.description||"",insert:"/"+c.name+" "})}items.sort((a,b)=>(a.kind==="cmd"?0:1)-(b.kind==="cmd"?0:1)||a.label.localeCompare(b.label));const mcpSlash=mcpItems.map(m=>({kind:"mcp",label:m.label,desc:m.desc,insert:m.insert}));items=[...items,...mcpSlash].slice(0,50)}else{const skills=[];for(const c of cmds){if(c.kind!=="skill")continue;const n=(c.name||"").toLowerCase();if(!q||n.includes(q))skills.push({kind:"skill",label:"@"+c.name,desc:c.description||"skill",insert:"@"+c.name+" "})}const files=await getFiles(mToken.q||"");const fitems=files.map(f=>({kind:"file",label:"@"+f.path,desc:f.name||"file",insert:"@"+f.path+" "}));items=[...skills,...mcpItems,...fitems].slice(0,30);if(!items.length&&!q)items=skills.slice(0,30)}mItems=items;mIndex=0;paintMention()}
+function paintMention(){if(!mToken){hideMention();return}if(!mItems.length){hideMention();return}mentionMenu.replaceChildren();let lastG="";mItems.forEach((it,i)=>{const g=it.kind==="cmd"?"Commands":it.kind==="skill"?"Skills":it.kind==="mcp"?"MCP Servers":"Files";if(g!==lastG){const h=document.createElement("div");h.className="mention-group";h.textContent=g;mentionMenu.append(h);lastG=g}const b=document.createElement("button");b.type="button";b.className="mention-item"+(i===mIndex?" active":"");const ic=document.createElement("span");ic.className="mention-icon";ic.textContent=it.kind==="cmd"?"/":it.kind==="skill"?"✦":it.kind==="mcp"?"◈":"📄";const main=document.createElement("span");main.className="mention-main";const nm=document.createElement("span");nm.className="mention-name";nm.textContent=it.label;const ds=document.createElement("span");ds.className="mention-desc";ds.textContent=esc(it.desc);main.append(nm,ds);const kd=document.createElement("span");kd.className="mention-kind";kd.textContent=it.kind;b.append(ic,main,kd);b.onmousedown=e=>{e.preventDefault();mIndex=i;mentionChoose()};mentionMenu.append(b)});mentionMenu.hidden=false;const sel=mentionMenu.querySelector(".mention-item.active");if(sel)sel.scrollIntoView({block:"nearest"})}
 function mentionChoose(){if(!mentionOpen()||!mItems.length||!mToken)return false;const it=mItems[mIndex];const v=promptBox.value||"";const nv=v.slice(0,mToken.start)+it.insert+v.slice(mToken.end);promptBox.value=nv;promptBox.focus();try{promptBox.setSelectionRange(mToken.start+it.insert.length,mToken.start+it.insert.length)}catch(e){}hideMention();promptBox.dispatchEvent(new Event("input"));return true}
 const modelPicker=document.querySelector("#modelPicker"),modelPickerList=document.querySelector("#modelPickerList");
 function closeModelPicker(){modelPicker.hidden=true}
@@ -439,6 +492,35 @@ async function chooseModel(provider,model){try{const result=await api("/api/sett
 document.querySelector("#closeModelPicker").onclick=closeModelPicker;
 modelPicker.addEventListener("click",e=>{if(e.target===modelPicker)closeModelPicker()});
 document.querySelector("#composerModel").onclick=()=>openModelPicker();
+/* Managed browser dual-control panel (screenshot streaming, not iframe) */
+const browserPanel=document.querySelector("#browserPanel"),browserView=document.querySelector("#browserView"),browserShot=document.querySelector("#browserShot"),browserUrl=document.querySelector("#browserUrl"),browserWho=document.querySelector("#browserWho"),browserCurrentUrl=document.querySelector("#browserCurrentUrl"),browserHighlight=document.querySelector("#browserHighlight"),browserControlToggle=document.querySelector("#browserControlToggle"),browserComment=document.querySelector("#browserComment"),browserCommentText=document.querySelector("#browserCommentText"),browserCommentTarget=document.querySelector("#browserCommentTarget"),browserToggle=document.querySelector("#browserToggle"),browserEmpty=document.querySelector("#browserEmpty"),browserLoading=document.querySelector("#browserLoading"),browserDot=document.querySelector("#browserDot");
+let browserOpen=false,browserSeq=-1,browserPollTimer=null,browserPicking=false,browserPicked=null,browserHoverTimer=0,browserControl="shared";
+function browserSetBusy(busy){browserLoading.hidden=!busy}
+function paintBrowserControl(){browserControlToggle.textContent=browserControl==="user"?"You":"Shared";browserControlToggle.classList.toggle("held",browserControl==="user")}
+function browserPageFocused(){const a=document.activeElement;return !!a&&(a===browserView||browserView.contains(a)||a===browserUrl)}
+function setBrowserOpen(open){browserOpen=open;browserPanel.hidden=!open;browserToggle.classList.toggle("active",open);if(open){paintBrowserControl();refreshBrowserState(true);browserView.focus();if(!browserPollTimer)browserPollTimer=setInterval(()=>{if(browserOpen&&!browserPicking)refreshBrowserState()},1500)}else{if(browserPollTimer){clearInterval(browserPollTimer);browserPollTimer=null}cancelPicker()}}
+browserToggle.onclick=()=>setBrowserOpen(!browserOpen);
+document.querySelector("#browserCollapse").onclick=()=>setBrowserOpen(false);
+(function(){const handle=document.querySelector("#browserResize");let drag=null;handle.addEventListener("pointerdown",e=>{drag={x:e.clientX,w:browserPanel.getBoundingClientRect().width};handle.classList.add("dragging");handle.setPointerCapture(e.pointerId);e.preventDefault()});handle.addEventListener("pointermove",e=>{if(!drag)return;const w=Math.min(720,Math.max(300,drag.w+(drag.x-e.clientX)));browserPanel.style.width=w+"px"});handle.addEventListener("pointerup",()=>{drag=null;handle.classList.remove("dragging")})})();
+function browserFrac(e){const r=browserShot.getBoundingClientRect();if(!r.width||!r.height)return null;const x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;if(x<0||y<0||x>1||y>1)return null;return{x,y}}
+async function refreshBrowserState(force){try{const s=await api("/api/browser/state");if(!force&&typeof s.seq==="number"&&s.seq===browserSeq)return;if(typeof s.seq==="number")browserSeq=s.seq;if(s.screenshot){browserShot.src="data:image/png;base64,"+s.screenshot;browserShot.hidden=false;browserEmpty.hidden=true}else if(!browserShot.src){browserEmpty.hidden=false}if(document.activeElement!==browserUrl)browserUrl.value=s.url||"";browserCurrentUrl.textContent=s.url||"";browserCurrentUrl.title=s.url||"";browserControl=s.control||"shared";paintBrowserControl();const who=s.last_actor==="user"?"You":s.last_actor==="agent"?"Agent":null;browserWho.textContent=who&&s.last_action?who+" · "+s.last_action:"Idle";browserDot.className="browser-dot "+(s.last_actor||"")}catch(e){}}
+async function browserAct(fn){browserSetBusy(true);try{await fn();await refreshBrowserState(true)}catch(e){notice.textContent=e.message}browserSetBusy(false)}
+async function browserNavigate(){const url=browserUrl.value.trim();if(!url)return;await browserAct(()=>api("/api/browser/navigate",{method:"POST",body:JSON.stringify({url})}))}
+browserUrl.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();browserNavigate()}});
+document.querySelector("#browserBack").onclick=()=>browserAct(()=>api("/api/browser/back",{method:"POST",body:"{}"}));
+document.querySelector("#browserForward").onclick=()=>browserAct(()=>api("/api/browser/forward",{method:"POST",body:"{}"}));
+document.querySelector("#browserReload").onclick=()=>browserAct(()=>api("/api/browser/reload",{method:"POST",body:"{}"}));
+browserControlToggle.onclick=async()=>{const mode=browserControl==="user"?"shared":"user";try{const r=await api("/api/browser/control",{method:"POST",body:JSON.stringify({mode})});browserControl=r.control;paintBrowserControl();notice.textContent=browserControl==="user"?"You have control. Agent browser tools are paused.":"Shared control resumed."}catch(e){notice.textContent=e.message}};
+browserShot.addEventListener("click",async e=>{const p=browserFrac(e);if(!p)return;if(browserPicking){await pickElement(p);return}await browserAct(()=>api("/api/browser/click",{method:"POST",body:JSON.stringify({x:p.x,y:p.y})}))});
+browserShot.addEventListener("mousemove",e=>{if(!browserPicking)return;const now=Date.now();if(now-browserHoverTimer<120)return;browserHoverTimer=now;const p=browserFrac(e);if(!p)return;api("/api/browser/hover",{method:"POST",body:JSON.stringify({x:p.x,y:p.y})}).then(r=>{const box=r.element&&r.element.box;if(!box){browserHighlight.hidden=true;return}const vr=browserView.getBoundingClientRect(),sr=browserShot.getBoundingClientRect();browserHighlight.hidden=false;browserHighlight.style.left=(sr.left-vr.left+box.x*sr.width+browserView.scrollLeft)+"px";browserHighlight.style.top=(sr.top-vr.top+box.y*sr.height+browserView.scrollTop)+"px";browserHighlight.style.width=box.w*sr.width+"px";browserHighlight.style.height=box.h*sr.height+"px"}).catch(()=>{})});
+function startPicker(){if(!browserOpen)setBrowserOpen(true);browserPicking=true;browserShot.classList.add("picking");document.querySelector("#browserPicker").classList.add("active");browserView.focus();notice.textContent="Picker active: hover an element, click to select, Esc to cancel."}
+function cancelPicker(){browserPicking=false;browserPicked=null;browserShot.classList.remove("picking");document.querySelector("#browserPicker").classList.remove("active");browserHighlight.hidden=true;browserComment.hidden=true}
+document.querySelector("#browserPicker").onclick=()=>{browserPicking?cancelPicker():startPicker()};
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="C"||e.key==="c")){if(!browserPageFocused())return;e.preventDefault();browserPicking?cancelPicker():startPicker();return}if(e.key==="Escape"&&browserPicking){e.preventDefault();cancelPicker()}});
+async function pickElement(p){try{const r=await api("/api/browser/pick",{method:"POST",body:JSON.stringify({x:p.x,y:p.y})});if(!r.ok){notice.textContent=r.error||"No element there";return}browserPicking=false;browserShot.classList.remove("picking");browserPicked=r;if(r.screenshot){browserShot.src="data:image/png;base64,"+r.screenshot;browserShot.hidden=false;browserEmpty.hidden=true}const box=r.box;if(box){const vr=browserView.getBoundingClientRect(),sr=browserShot.getBoundingClientRect();browserHighlight.hidden=false;browserHighlight.style.left=(sr.left-vr.left+box.x*sr.width+browserView.scrollLeft)+"px";browserHighlight.style.top=(sr.top-vr.top+box.y*sr.height+browserView.scrollTop)+"px";browserHighlight.style.width=box.w*sr.width+"px";browserHighlight.style.height=box.h*sr.height+"px"}browserCommentTarget.textContent=r.selector||r.tag||"element";browserCommentText.value="";browserComment.hidden=false;browserCommentText.focus()}catch(e){notice.textContent=e.message}}
+document.querySelector("#browserCommentCancel").onclick=cancelPicker;
+document.querySelector("#browserCommentSubmit").onclick=async()=>{const text=browserCommentText.value.trim();if(!text||!browserPicked)return;try{await api("/api/browser/comment",{method:"POST",body:JSON.stringify({comment:text,selector:browserPicked.selector,outerHTML:browserPicked.outerHTML,url:browserPicked.url,screenshot:browserPicked.screenshot,session_id:activeSessionId})});notice.textContent="Comment sent to the agent.";cancelPicker();await refreshBrowserState()}catch(e){notice.textContent=e.message}};
+
 </script>
 </body>
 </html>"""
@@ -542,7 +624,10 @@ def _create_state(workspace: str | Path) -> _AppState:
         base_url=provider_config.get("base_url"),
         model=provider_config.get("default_model"),
     )
-    session = Session.create(provider_name, provider.model)
+    session = _find_resume_session(root)
+    if session is None:
+        session = Session.create(provider_name, provider.model)
+        session.session_id = f"{session.session_id}_{uuid.uuid4().hex[:8]}"
     session.workspace = str(root)
     tool_context = ToolContext(workspace_root=root)
     return _AppState(
@@ -686,9 +771,108 @@ def _list_commands_for(workspace: Path) -> list[dict[str, Any]]:
                 "kind": info.kind or "command",
                 "aliases": list(info.aliases or []),
             })
-        return out
+        # /mcp is terminal-only in command_surface so build_command_list hides
+        # it — but the web app manages the same ~/.clawd/mcp.json, so expose it
+        # explicitly for the slash menu.
+        if not any(d["name"] == "mcp" for d in out):
+            out.append({
+                "name": "mcp",
+                "description": "List MCP servers (/mcp) · add stdio or URL (/mcp add <name> <command|url> [args]) · add from link, AI figures it out (/mcp add-link <url>) · remove (/mcp remove <name>)",
+                "kind": "local",
+                "aliases": [],
+            })
+        return sorted(out, key=lambda d: d["name"].lower())
     except Exception:
         return []
+
+
+def _run_mcp_command(args_str: str) -> str:
+    from src.command_system.builtins import add_mcp_server, list_mcp_servers, load_mcp_config, save_mcp_config
+
+    parts = (args_str or "").strip().split()
+    action = parts[0].lower() if parts else "list"
+
+    def _fmt(s: dict) -> str:
+        if s.get("url"):
+            return f"- {s['name']}: {s['url']} (remote)"
+        arg_str = (" " + " ".join(s["args"])) if s.get("args") else ""
+        return f"- {s['name']}: {s.get('command', '')}{arg_str}"
+
+    if action in {"list", "ls", ""}:
+        servers = list_mcp_servers()
+        if not servers:
+            return "MCP servers: (none)\nAdd: /mcp add <name> <command|url> [args...] or paste a link: /mcp add-link <url>"
+        lines = [f"MCP servers ({len(servers)}):"]
+        for s in servers:
+            lines.append(_fmt(s))
+        lines.append("Add: /mcp add <name> <command|url> [args...] · From link: /mcp add-link <url> · Remove: /mcp remove <name>")
+        return "\n".join(lines)
+    if action in {"add-link", "addlink", "from-link", "install"}:
+        if len(parts) < 2:
+            return "Usage: /mcp add-link <url> [name] — figuring it out automatically from the link."
+        from src.command_system.builtins import auto_install_mcp_from_link
+
+        link = parts[1]
+        hint = parts[2] if len(parts) > 2 else None
+        try:
+            entry = auto_install_mcp_from_link(link, hint)
+        except ValueError as exc:
+            return f"MCP install failed: {exc}"
+        note = f"\n{entry['note']}" if entry.get("note") else ""
+        if entry.get("url"):
+            return f"Added remote MCP server '{entry['name']}': {entry['url']}{note}"
+        arg_str = (" " + " ".join(entry["args"])) if entry.get("args") else ""
+        return f"Added MCP server '{entry['name']}': {entry['command']}{arg_str}{note}"
+    # Bare URL: /mcp <url> — same as add-link
+    if action.lower().startswith(("http://", "https://")):
+        from src.command_system.builtins import auto_install_mcp_from_link
+
+        try:
+            entry = auto_install_mcp_from_link(action)
+        except ValueError as exc:
+            return f"MCP install failed: {exc}"
+        note = f"\n{entry['note']}" if entry.get("note") else ""
+        if entry.get("url"):
+            return f"Added remote MCP server '{entry['name']}': {entry['url']}{note}"
+        arg_str = (" " + " ".join(entry["args"])) if entry.get("args") else ""
+        return f"Added MCP server '{entry['name']}': {entry['command']}{arg_str}{note}"
+    if action == "add":
+        if len(parts) == 2 and parts[1].lower().startswith(("http://", "https://")):
+            from src.command_system.builtins import auto_install_mcp_from_link
+
+            try:
+                entry = auto_install_mcp_from_link(parts[1])
+            except ValueError as exc:
+                return f"MCP install failed: {exc}"
+            note = f"\n{entry['note']}" if entry.get("note") else ""
+            if entry.get("url"):
+                return f"Added remote MCP server '{entry['name']}': {entry['url']}{note}"
+            arg_str = (" " + " ".join(entry["args"])) if entry.get("args") else ""
+            return f"Added MCP server '{entry['name']}': {entry['command']}{arg_str}{note}"
+        if len(parts) < 3:
+            return "Usage: /mcp add <name> <command|url> [args...] — or just /mcp add <url> / /mcp add-link <url>"
+        name, command, extra = parts[1], parts[2], parts[3:]
+        try:
+            entry = add_mcp_server(name, command, extra)
+        except ValueError as exc:
+            return f"MCP add failed: {exc}"
+        if entry.get("url"):
+            return f"Added remote MCP server '{entry['name']}': {entry['url']}"
+        arg_str = (" " + " ".join(entry["args"])) if entry["args"] else ""
+        return f"Added MCP server '{entry['name']}': {entry['command']}{arg_str}"
+    if action in {"remove", "rm", "delete", "forget"}:
+        if len(parts) < 2:
+            return "Usage: /mcp remove <name>"
+        name = parts[1]
+        cfg = load_mcp_config()
+        servers = cfg.get("mcpServers") or {}
+        if name not in servers:
+            return f"No MCP server named '{name}'."
+        del servers[name]
+        cfg["mcpServers"] = servers
+        save_mcp_config(cfg)
+        return f"Removed MCP server '{name}'."
+    return "Usage: /mcp [list] · /mcp add <name> <command|url> [args...] · /mcp add-link <url> · /mcp remove <name>"
 
 
 def _search_files(workspace: Path, query: str, limit: int = 20) -> list[dict[str, Any]]:
@@ -785,6 +969,19 @@ def _expand_chat_message(workspace: Path, message: str, tool_context: Any, regis
             if not token:
                 continue
             ltok = token.lower()
+            if ltok.startswith("mcp:"):
+                _mcp_name = token.split(":", 1)[1]
+                try:
+                    from src.command_system.builtins import list_mcp_servers as _list_mcp
+
+                    for _s in _list_mcp():
+                        if _s["name"] == _mcp_name:
+                            _arg = (" " + " ".join(_s["args"])) if _s["args"] else ""
+                            extra.append(f"[User attached MCP server @{token}.]\nServer '{_s['name']}': {_s['command']}{_arg}\nUse the MCP tool with server=\"{_s['name']}\" to call its tools.")
+                            break
+                except Exception:
+                    pass
+                continue
             if ltok.startswith("skill:"):
                 sname = token.split(":", 1)[1]
                 s = _find_skill(sname, project_root=workspace)
@@ -820,6 +1017,32 @@ def _expand_chat_message(workspace: Path, message: str, tool_context: Any, regis
                 pass
     except Exception:
         pass
+    # MCP install from just a link: "add this MCP: <url>" / "install mcp <url>"
+    try:
+        import re as _re2
+
+        _urls = _re2.findall(r"https?://[^\s)>\]]+", text)
+        if _urls and _re2.search(r"(?i)\b(mcp|model context protocol)\b.*(add|install|connect|setup|use this)|(add|install|connect|setup).*mcp", text):
+            _u = _urls[0].rstrip(".,;:!?)]}")
+            try:
+                from pathlib import Path as _P
+
+                _cfg = _P.home() / ".clawd" / "mcp.json"
+                extra.append(
+                    "[User wants this MCP server installed from a link. Do it now with your tools, no questions.]\n"
+                    f"Link: {_u}\n"
+                    f"Config file: {_cfg} (JSON with top-level {{\"mcpServers\": {{...}}}}; readable/writable from any workspace)\n"
+                    "Steps: 1) WebFetch the link (follow README/docs). "
+                    "2) Decide remote vs stdio: if the page gives an HTTP/SSE endpoint use {\"url\": \"...\"}; "
+                    "else use {\"command\": \"...\", \"args\": [...]} (often npx/node/docker). "
+                    "3) Pick a short kebab-case name from the page/repo. "
+                    "4) Read mcp.json if it exists, add mcpServers.<name>, Write it back. "
+                    "5) Reply with the added name + what it exposes."
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
     if extra:
         return text + "\n\n" + "\n\n".join(extra)
     return text
@@ -832,9 +1055,10 @@ def _change_workspace(state: _AppState, workspace: str) -> Path:
     if not root.is_dir():
         raise ValueError(f"Not a directory: {root}")
     with state.lock:
-        session = Session.create(state.provider_name, state.provider.model)
-        session.session_id = f"{session.session_id}_{uuid.uuid4().hex[:8]}"
-        session.workspace = str(state.workspace)
+        session = _find_resume_session(root)
+        if session is None:
+            session = Session.create(state.provider_name, state.provider.model)
+            session.session_id = f"{session.session_id}_{uuid.uuid4().hex[:8]}"
         session.workspace = str(root)
         state.workspace = root
         state.session = session
@@ -971,6 +1195,45 @@ def _session_has_running_job_safe(state: _AppState | None, session_id: str) -> b
         job.session_id == session_id and job.status in {"running", "waiting"}
         for job in jobs
     )
+
+
+def _find_resume_session(root: Path) -> Session | None:
+    """Most recently updated saved chat for this workspace, if any.
+
+    Lets `clawd web` restarts (and workspace switches) pick up where the
+    user left off instead of minting a fresh session every time. Only
+    sessions whose working folder still exists are candidates; legacy
+    sessions without a workspace are adopted for the current folder.
+    """
+    try:
+        want = str(Path(root).expanduser().resolve())
+    except (OSError, RuntimeError, ValueError):
+        return None
+    session_dir = Path.home() / ".clawd" / "sessions"
+    if not session_dir.exists():
+        return None
+    best: Session | None = None
+    for session_file in session_dir.glob("*.json"):
+        if not _SESSION_ID_PATTERN.fullmatch(session_file.stem):
+            continue
+        try:
+            session = Session.load(session_file.stem)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            continue
+        if session is None or _session_workspace_missing(session):
+            continue
+        if session.workspace:
+            try:
+                workspace = str(Path(session.workspace).expanduser().resolve())
+            except (OSError, RuntimeError, ValueError):
+                continue
+            if workspace != want:
+                continue
+        if best is None or session.updated_at > best.updated_at:
+            best = session
+    if best is not None and not best.workspace:
+        best.workspace = want
+    return best
 
 
 def _saved_sessions(state: _AppState | None = None) -> list[Session]:
@@ -1397,6 +1660,13 @@ def _run_job(state: _AppState, job: _Job, message: str) -> None:
                                   "elapsed_ms": job.elapsed_ms})
 
 
+def _get_browser_manager():
+    """Lazy singleton access (playwright stays optional)."""
+    from src.tool_system.tools.browser_manager import get_browser_manager
+
+    return get_browser_manager()
+
+
 def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "ClawdWeb/1.0"
@@ -1571,6 +1841,16 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     return
                 self._json(200, {"files": files})
                 return
+            if path == "/api/mcp":
+                try:
+                    from src.command_system.builtins import list_mcp_servers
+
+                    servers = list_mcp_servers()
+                except Exception as exc:
+                    self._json(500, {"error": str(exc)})
+                    return
+                self._json(200, {"servers": servers})
+                return
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["api", "jobs"] and parts[3] == "stream":
                 with state.lock:
@@ -1607,6 +1887,14 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     }
                 self._json(200, payload)
                 return
+            if path == "/api/browser/state":
+                try:
+                    browser_state = _get_browser_manager().get_state()
+                except Exception as exc:
+                    self._json(500, {"error": f"Browser unavailable: {exc}"})
+                    return
+                self._json(200, browser_state)
+                return
             self._json(404, {"error": "Not found"})
 
         def _serve_job_stream(self, job: _Job, last_seq: int) -> None:
@@ -1641,6 +1929,113 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                 # itself is unaffected.
                 pass
 
+        def _handle_browser_api(self, path: str, payload: dict[str, Any]) -> None:
+            """Dual-control managed browser: user actions drive the same shared page."""
+            try:
+                manager = _get_browser_manager()
+            except Exception as exc:
+                self._json(500, {"error": f"Browser unavailable: {exc}"})
+                return
+            try:
+                if path == "/api/browser/navigate":
+                    url = payload.get("url")
+                    if not isinstance(url, str) or not url.strip():
+                        self._json(400, {"error": "url must be a non-empty string"})
+                        return
+                    self._json(200, manager.navigate(url.strip(), actor="user"))
+                    return
+                if path == "/api/browser/click":
+                    selector = payload.get("selector") or payload.get("ref")
+                    if isinstance(selector, str) and selector:
+                        self._json(200, manager.click(selector, actor="user"))
+                        return
+                    x, y = payload.get("x"), payload.get("y")
+                    if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                        self._json(200, manager.click_at(float(x), float(y), actor="user"))
+                        return
+                    self._json(400, {"error": "provide selector or x/y coordinates"})
+                    return
+                if path == "/api/browser/type":
+                    selector = payload.get("selector")
+                    text = payload.get("text", "")
+                    if not isinstance(selector, str) or not selector:
+                        self._json(400, {"error": "selector must be a non-empty string"})
+                        return
+                    if not isinstance(text, str):
+                        self._json(400, {"error": "text must be a string"})
+                        return
+                    self._json(200, manager.type(selector, text, actor="user"))
+                    return
+                if path == "/api/browser/back":
+                    self._json(200, manager.back(actor="user"))
+                    return
+                if path == "/api/browser/forward":
+                    self._json(200, manager.forward(actor="user"))
+                    return
+                if path == "/api/browser/reload":
+                    self._json(200, manager.reload(actor="user"))
+                    return
+                if path == "/api/browser/control":
+                    mode = payload.get("mode")
+                    if mode not in ("shared", "user"):
+                        self._json(400, {"error": "mode must be 'shared' or 'user'"})
+                        return
+                    self._json(200, manager.set_control(mode, actor="user"))
+                    return
+                if path == "/api/browser/hover":
+                    x, y = payload.get("x"), payload.get("y")
+                    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+                        self._json(400, {"error": "x and y must be numbers"})
+                        return
+                    self._json(200, manager.hover_at(float(x), float(y)))
+                    return
+                if path == "/api/browser/pick":
+                    x, y = payload.get("x"), payload.get("y")
+                    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+                        self._json(400, {"error": "x and y must be numbers"})
+                        return
+                    self._json(200, manager.pick_at(float(x), float(y)))
+                    return
+                if path == "/api/browser/comment":
+                    comment = payload.get("comment", "")
+                    if not isinstance(comment, str) or not comment.strip():
+                        self._json(400, {"error": "comment must be a non-empty string"})
+                        return
+                    result = manager.submit_comment(payload)
+                    if not result.get("ok"):
+                        self._json(500, {"error": "could not store comment"})
+                        return
+                    # Deliver to the agent as context: append a user message to
+                    # the target (or active) session so the next turn sees it.
+                    entry = result["comment"]
+                    session_id = payload.get("session_id")
+                    with state.lock:
+                        target = None
+                        if isinstance(session_id, str) and session_id in state.sessions:
+                            target = state.sessions[session_id]
+                        else:
+                            target = state.session
+                    if target is not None:
+                        try:
+                            target.conversation.add_user_message(
+                                f"[browser element comment] {entry['comment']}\n"
+                                f"page: {entry['url']}\n"
+                                f"selector: {entry['selector']}\n"
+                                f"html: {entry['outerHTML'][:1000]}"
+                            )
+                            try:
+                                target.save()
+                            except OSError:
+                                pass
+                        except Exception:
+                            pass
+                    self._json(200, result)
+                    return
+            except Exception as exc:
+                self._json(500, {"error": f"Browser action failed: {exc}"})
+                return
+            self._json(404, {"error": "Not found"})
+
         def _read_json(self) -> dict[str, Any] | None:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1666,6 +2061,9 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                 return
             payload = self._read_json()
             if payload is None:
+                return
+            if path.startswith("/api/browser/"):
+                self._handle_browser_api(path, payload)
                 return
             if path == "/api/chat/retry":
                 # Conversation surgery for regenerate/edit: truncates the
@@ -1762,6 +2160,36 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                         expanded_msg = _expand_chat_message(session_workspace, stripped_msg, tool_context, state.registry)
                     except Exception:
                         expanded_msg = stripped_msg
+                    # /mcp runs locally (no LLM): list/add/remove ~/.clawd/mcp.json
+                    if stripped_msg == "/mcp" or stripped_msg.lower().startswith("/mcp "):
+                        try:
+                            from src.command_surface import parse_slash as _parse_mcp
+
+                            _parsed = _parse_mcp(stripped_msg)
+                            _mcp_args = _parsed[1] if _parsed else ""
+                            _mcp_text = _run_mcp_command(_mcp_args)
+                        except Exception as exc:
+                            _mcp_text = f"MCP error: {exc}"
+                        session.conversation.add_user_message(stripped_msg)
+                        session.conversation.add_assistant_message(_mcp_text)
+                        try:
+                            session.save()
+                        except OSError:
+                            pass
+                        job = _Job(
+                            job_id=uuid.uuid4().hex,
+                            session_id=session_id,
+                            session=session,
+                            tool_context=tool_context,
+                            prompt=stripped_msg,
+                            message_added=True,
+                            status="completed",
+                            text=_mcp_text,
+                            timeline=[{"kind": "text", "text": _mcp_text}],
+                        )
+                        state.jobs[job.job_id] = job
+                        self._json(202, {"job_id": job.job_id, "session_id": job.session_id})
+                        return
                     if stripped_msg.startswith("/"):
                         try:
                             from src.command_surface import parse_slash as _parse_slash
@@ -2110,6 +2538,40 @@ def _make_handler(state: _AppState) -> type[BaseHTTPRequestHandler]:
                     "auto_delete_broken_sessions": _auto_delete_broken_sessions_enabled(),
                 })
                 return
+            if path == "/api/mcp":
+                action = str(payload.get("action") or "").strip().lower()
+                try:
+                    from src.command_system.builtins import list_mcp_servers
+
+                    if action in {"", "list"}:
+                        self._json(200, {"servers": list_mcp_servers()})
+                        return
+                    if action == "add":
+                        name = str(payload.get("name") or "").strip()
+                        command = str(payload.get("command") or payload.get("url") or "").strip()
+                        args = payload.get("args") or []
+                        if not isinstance(args, list):
+                            self._json(400, {"error": "args must be a list"})
+                            return
+                        text = _run_mcp_command(f"add {name} {command} {' '.join(str(a) for a in args)}".strip())
+                        if text.startswith("MCP add failed"):
+                            self._json(400, {"error": text})
+                            return
+                        self._json(200, {"ok": True, "message": text, "servers": list_mcp_servers()})
+                        return
+                    if action in {"remove", "rm", "delete"}:
+                        name = str(payload.get("name") or "").strip()
+                        text = _run_mcp_command(f"remove {name}")
+                        if text.startswith("No MCP server"):
+                            self._json(404, {"error": text})
+                            return
+                        self._json(200, {"ok": True, "message": text, "servers": list_mcp_servers()})
+                        return
+                    self._json(400, {"error": "action must be list, add, or remove"})
+                    return
+                except Exception as exc:
+                    self._json(500, {"error": str(exc)})
+                    return
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["api", "jobs"] and parts[3] == "cancel":
                 with state.lock:

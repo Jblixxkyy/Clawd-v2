@@ -49,6 +49,13 @@ class FileWriteTool:
             return PermissionResult.allow()  # Path validation happens in run()
 
         if path.suffix.lower() in {".md", ".markdown"} and not context.permission_context.allow_docs:
+            try:
+                from ..context import is_managed_skill_path
+
+                if is_managed_skill_path(path):
+                    return PermissionResult.allow()
+            except Exception:
+                pass
             return PermissionResult.ask(
                 message="Writing documentation files is blocked unless allow_docs is enabled",
                 suggestion="Enable allow_docs to write .md files",

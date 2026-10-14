@@ -1455,13 +1455,16 @@ class ClawdREPL:
         self.console.print(f"[dim]{render_status(self)}[/dim]\n")
 
     def _handle_mcp_command(self, raw: str) -> None:
-        """List configured MCP servers, or add a stdio server.
+        """List configured MCP servers, or add a server.
 
         /mcp                            list servers
-        /mcp add <name> <command> [args...]   add a server (prompts for missing parts)
+        /mcp add <name> <command|url> [args...]   add a server
+        /mcp add <url> / /mcp add-link <url> [name]  auto-install from a link
+        /mcp <url>                      same as add-link
         """
         from src.command_system.builtins import (
             add_mcp_server,
+            auto_install_mcp_from_link,
             get_mcp_config_path,
             list_mcp_servers,
         )
@@ -1469,7 +1472,43 @@ class ClawdREPL:
         parts = raw.strip().split()
         action = parts[1].lower() if len(parts) > 1 else "list"
 
+        # Bare URL: /mcp <url>
+        if action.startswith(("http://", "https://")):
+            try:
+                entry = auto_install_mcp_from_link(action)
+            except ValueError as e:
+                self.console.print(f"[red]MCP install failed: {e}[/red]")
+                return
+            self._print_mcp_entry(entry)
+            return
+
+        if action in {"add-link", "addlink", "from-link", "install"}:
+            link = parts[2] if len(parts) > 2 else ""
+            hint = parts[3] if len(parts) > 3 else None
+            if not link:
+                try:
+                    link = input("Link: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    self.console.print()
+                    return
+            try:
+                entry = auto_install_mcp_from_link(link, hint)
+            except ValueError as e:
+                self.console.print(f"[red]MCP install failed: {e}[/red]")
+                return
+            self._print_mcp_entry(entry)
+            return
+
         if action == "add":
+            # Link-only: /mcp add <url>
+            if len(parts) == 3 and parts[2].lower().startswith(("http://", "https://")):
+                try:
+                    entry = auto_install_mcp_from_link(parts[2])
+                except ValueError as e:
+                    self.console.print(f"[red]MCP install failed: {e}[/red]")
+                    return
+                self._print_mcp_entry(entry)
+                return
             name = parts[2] if len(parts) > 2 else ""
             command = parts[3] if len(parts) > 3 else ""
             extra_args = parts[4:] if len(parts) > 4 else []
@@ -1477,34 +1516,44 @@ class ClawdREPL:
                 if not name:
                     name = input("Server name: ").strip()
                 if not command:
-                    command = input("Command: ").strip()
-                if not extra_args:
+                    command = input("Command or URL: ").strip()
+                if not extra_args and not command.lower().startswith(("http://", "https://")):
                     arg_line = input("Args (space-separated, optional): ").strip()
                     extra_args = arg_line.split() if arg_line else []
             except (EOFError, KeyboardInterrupt):
                 self.console.print()
+                return
+            # URL as command with no name details -> auto-install keeps typed name
+            if command.lower().startswith(("http://", "https://")) and not extra_args:
+                from src.command_system.builtins import add_mcp_server_url
+
+                try:
+                    entry = add_mcp_server_url(name, command)
+                except ValueError as e:
+                    self.console.print(f"[red]{e}[/red]")
+                    return
+                self._print_mcp_entry(entry)
                 return
             try:
                 entry = add_mcp_server(name, command, extra_args)
             except ValueError as e:
                 self.console.print(f"[red]{e}[/red]")
                 return
-            arg_str = (" " + " ".join(entry["args"])) if entry["args"] else ""
-            self.console.print(
-                f"[green]Added MCP server '{entry['name']}': {entry['command']}{arg_str}[/green]"
-            )
-            self.console.print(f"[dim]Saved to {get_mcp_config_path()}[/dim]\n")
+            self._print_mcp_entry(entry)
             return
 
         servers = list_mcp_servers()
         if not servers:
             self.console.print("\n[bold]MCP servers:[/bold] [dim](none)[/dim]")
-            self.console.print("[dim]Add one with /mcp add <name> <command> [args...][/dim]\n")
+            self.console.print("[dim]Paste a link: /mcp add-link <url> — or /mcp add <name> <command|url> [args...][/dim]\n")
             return
         body = []
         for s in servers:
-            arg_str = (" " + " ".join(s["args"])) if s["args"] else ""
-            body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['command']}{arg_str}[/dim]")
+            if s.get("url"):
+                body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['url']} (remote)[/dim]")
+            else:
+                arg_str = (" " + " ".join(s["args"])) if s["args"] else ""
+                body.append(f"[bold cyan]{s['name']}[/bold cyan]\n  [dim]{s['command']}{arg_str}[/dim]")
         self.console.print()
         self.console.print(
             Panel(
@@ -1514,7 +1563,20 @@ class ClawdREPL:
                 padding=(1, 2),
             )
         )
-        self.console.print("[dim]Add one with /mcp add <name> <command> [args...][/dim]\n")
+        self.console.print("[dim]Paste a link: /mcp add-link <url> — or /mcp add <name> <command|url> [args...][/dim]\n")
+
+    def _print_mcp_entry(self, entry: dict) -> None:
+        from src.command_system.builtins import get_mcp_config_path
+
+        if entry.get("url"):
+            detail = f"{entry['url']} (remote)"
+        else:
+            arg_str = (" " + " ".join(entry["args"])) if entry.get("args") else ""
+            detail = f"{entry.get('command', '')}{arg_str}"
+        self.console.print(f"[green]Added MCP server '{entry['name']}': {detail}[/green]")
+        if entry.get("note"):
+            self.console.print(f"[dim]{entry['note']}[/dim]")
+        self.console.print(f"[dim]Saved to {get_mcp_config_path()}[/dim]\n")
 
     def _handle_resume_command(self, raw: str) -> None:
         """Pick a saved session to resume.

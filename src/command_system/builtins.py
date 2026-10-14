@@ -1337,7 +1337,7 @@ def list_mcp_servers() -> list[dict[str, Any]]:
     """List configured MCP servers.
 
     Returns:
-        List of dicts with keys: name, command, args (list of str).
+        List of dicts with keys: name, command, args (list of str), url.
     """
     servers = load_mcp_config().get("mcpServers") or {}
     out: list[dict[str, Any]] = []
@@ -1350,6 +1350,7 @@ def list_mcp_servers() -> list[dict[str, Any]]:
                 "name": name,
                 "command": str(spec.get("command") or ""),
                 "args": [str(a) for a in args] if isinstance(args, list) else [],
+                "url": str(spec.get("url") or ""),
             }
         )
     return sorted(out, key=lambda s: s["name"].lower())
@@ -1358,16 +1359,7 @@ def list_mcp_servers() -> list[dict[str, Any]]:
 def add_mcp_server(name: str, command: str, args: list[str] | None = None) -> dict[str, Any]:
     """Add a stdio MCP server to the config.
 
-    Args:
-        name: Server name (must be non-empty and not already configured).
-        command: Executable to launch (must be non-empty).
-        args: Optional argument list.
-
-    Returns:
-        The server entry that was written.
-
-    Raises:
-        ValueError: On empty name/command or a duplicate name.
+    If command looks like http(s)://, it is stored as a remote {url} server.
     """
     name = (name or "").strip()
     command = (command or "").strip()
@@ -1383,12 +1375,166 @@ def add_mcp_server(name: str, command: str, args: list[str] | None = None) -> di
     if name in servers:
         raise ValueError(f"MCP server '{name}' is already configured.")
 
-    entry: dict[str, Any] = {"command": command}
+    if command.lower().startswith(("http://", "https://")) and not arg_list:
+        entry: dict[str, Any] = {"url": command}
+        servers[name] = entry
+        save_mcp_config(config)
+        return {"name": name, "command": "", "args": [], "url": command}
+
+    entry = {"command": command}
     if arg_list:
         entry["args"] = arg_list
     servers[name] = entry
     save_mcp_config(config)
-    return {"name": name, "command": command, "args": arg_list}
+    return {"name": name, "command": command, "args": arg_list, "url": ""}
+
+
+def add_mcp_server_url(name: str, url: str) -> dict[str, Any]:
+    """Add a remote HTTP/SSE MCP server."""
+    name = (name or "").strip()
+    url = (url or "").strip()
+    if not name:
+        raise ValueError("Server name must be non-empty.")
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://.")
+    config = load_mcp_config()
+    servers = config.setdefault("mcpServers", {})
+    if name in servers:
+        raise ValueError(f"MCP server '{name}' is already configured.")
+    servers[name] = {"url": url}
+    save_mcp_config(config)
+    return {"name": name, "command": "", "args": [], "url": url}
+
+
+def _derive_mcp_name(url: str, hint: str | None = None) -> str:
+    import re
+    from urllib.parse import urlsplit
+
+    if hint and hint.strip():
+        base = re.sub(r"[^a-zA-Z0-9-]+", "-", hint.strip()).strip("-").lower()
+        if base:
+            return base[:64]
+    try:
+        parts = [p for p in urlsplit(url).path.split("/") if p]
+        if parts:
+            last = parts[-1]
+            last = re.sub(r"\.git$", "", last, flags=re.I)
+            base = re.sub(r"[^a-zA-Z0-9-]+", "-", last).strip("-").lower()
+            if base:
+                return base[:64]
+    except Exception:
+        pass
+    return "mcp-server"
+
+
+def _fetch_url_text(url: str, timeout: int = 12, max_chars: int = 60000) -> str:
+    import urllib.request
+
+    req = urllib.request.Request(url, headers={"User-Agent": "clawd-mcp-installer/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read(max_chars + 1)
+    text = raw[:max_chars].decode("utf-8", errors="replace")
+    return text
+
+
+def auto_install_mcp_from_link(url: str, name_hint: str | None = None) -> dict[str, Any]:
+    """Install an MCP server from just a link (GitHub repo, README, install-mcp URL, or remote endpoint).
+
+    Figures out stdio vs remote, writes ~/.clawd/mcp.json, returns the entry plus a note.
+    """
+    import base64
+    import re
+    from urllib.parse import parse_qs, urlsplit
+
+    url = (url or "").strip().rstrip(".,;:!?)]}")
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("Provide an http(s) link to the MCP server.")
+    name = _derive_mcp_name(url, name_hint)
+
+    # 1) install-mcp config link: ?config=<base64 {command,args,name}>
+    try:
+        qs = parse_qs(urlsplit(url).query)
+        cfg_b64 = (qs.get("config") or [""])[0]
+        if cfg_b64:
+            padded = cfg_b64 + "=" * (-len(cfg_b64) % 4)
+            cfg = json.loads(base64.urlsafe_b64decode(padded).decode("utf-8", errors="replace"))
+            cmd = str(cfg.get("command") or "").strip()
+            args = [str(a) for a in (cfg.get("args") or []) if str(a).strip()]
+            cfg_name = str(cfg.get("name") or name).strip() or name
+            if cmd:
+                entry = add_mcp_server(cfg_name, cmd, args)
+                entry["note"] = f"installed from install-mcp link: {url}"
+                return entry
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        pass  # fall through to GitHub heuristics
+
+    # 2) GitHub owner/repo(.git) links: fetch package.json / server.json / README
+    m = re.match(r"https?://github\.com/([^/]+)/([^/#?]+?)(?:\.git)?/?(?:[#?].*)?$", url, re.I)
+    if m:
+        owner, repo = m.group(1), re.sub(r"\.git$", "", m.group(2), flags=re.I)
+        repo_name = _derive_mcp_name(repo, name_hint)
+        for branch in ("main", "master"):
+            base = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}"
+            # package.json -> npm package -> npx -y <pkg>
+            try:
+                pkg = json.loads(_fetch_url_text(f"{base}/package.json"))
+                npm_name = str(pkg.get("name") or "").strip()
+                if npm_name and "/" not in npm_name or npm_name.startswith("@"):
+                    entry = add_mcp_server(repo_name, "npx", ["-y", npm_name])
+                    entry["note"] = f"installed from GitHub {owner}/{repo} (npm package {npm_name})"
+                    return entry
+            except Exception:
+                pass
+            # server.json (MCP registry metadata) may carry the run command
+            try:
+                srv = json.loads(_fetch_url_text(f"{base}/server.json"))
+                for key in ("command", "run", "start"):
+                    if isinstance(srv.get(key), str) and srv[key].strip():
+                        entry = add_mcp_server(repo_name, srv[key].strip(), [])
+                        entry["note"] = f"installed from {owner}/{repo}/server.json"
+                        return entry
+            except Exception:
+                pass
+            # README: look for install-mcp config link or npx/uvx one-liner
+            try:
+                readme = _fetch_url_text(f"{base}/README.md")
+                cfg_m = re.search(r"install-mcp/\?config=([A-Za-z0-9\-_=]+)", readme)
+                if cfg_m:
+                    return auto_install_mcp_from_link(f"https://adamjones.me/install-mcp/?config={cfg_m.group(1)}", repo_name)
+                npx_m = re.search(r"npx\s+(?:-y\s+)?(@?[A-Za-z0-9@/_.-]+)", readme)
+                if npx_m:
+                    pkg_guess = npx_m.group(1).strip().rstrip(".,;:'\")]}")
+                    if pkg_guess and len(pkg_guess) < 120 and pkg_guess not in {"-y"}:
+                        try:
+                            entry = add_mcp_server(repo_name, "npx", ["-y", pkg_guess])
+                            entry["note"] = f"installed from {owner}/{repo} README (npx {pkg_guess})"
+                            return entry
+                        except ValueError:
+                            pass
+                uvx_m = re.search(r"uvx\s+([A-Za-z0-9@/_.-]+)", readme)
+                if uvx_m:
+                    tool = uvx_m.group(1).strip().rstrip(".,;:'\")]}")
+                    if tool:
+                        try:
+                            entry = add_mcp_server(repo_name, "uvx", [tool])
+                            entry["note"] = f"installed from {owner}/{repo} README (uvx {tool})"
+                            return entry
+                        except ValueError:
+                            pass
+            except Exception:
+                pass
+        # Fallback for GitHub: npx -y <repo> (works for JS MCPs like computer-use-mcp)
+        try:
+            entry = add_mcp_server(repo_name, "npx", ["-y", repo])
+            entry["note"] = f"installed from GitHub {owner}/{repo} (default npx -y {repo}; fix in /mcp if the README says otherwise)"
+            return entry
+        except ValueError as exc:
+            raise ValueError(str(exc))
+
+    # 3) Anything else http(s): treat as a remote MCP endpoint.
+    entry = add_mcp_server_url(name, url)
+    entry["note"] = f"installed as remote MCP endpoint: {url}"
+    return entry
 
 
 # ---------------------------------------------------------------------------
