@@ -58,8 +58,8 @@ class PowerShellTool:
         return ToolSpec(
             name="PowerShell",
             description=(
-                "Run a PowerShell command (Windows only). Requires the explicit opt-in "
-                "\"enable_powershell\": true in ~/.clawd/config.json. "
+                "Run a PowerShell command (Windows only). Enabled by default; set "
+                "\"enable_powershell\": false in ~/.clawd/config.json to opt out. "
                 "Write PowerShell syntax only -- never bash syntax."
             ),
             input_schema={
@@ -75,15 +75,15 @@ class PowerShellTool:
     def run(self, tool_input: dict[str, Any], context: ToolContext) -> ToolResult:
         if platform.system().lower() != "windows":
             return ToolResult(name="PowerShell", output={"error": "PowerShell is only supported on Windows"}, is_error=True)
-        # Explicit opt-in gate (default off): the tool stays inert unless the
-        # user sets "enable_powershell": true in ~/.clawd/config.json.
-        if not getattr(context, "enable_powershell", False):
+        # Default ON (Windows): the tool stays inert only when the user
+        # explicitly sets "enable_powershell": false in ~/.clawd/config.json.
+        if not getattr(context, "enable_powershell", True):
             return ToolResult(
                 name="PowerShell",
                 output={
                     "error": (
-                        "PowerShell execution is not enabled. To opt in, set "
-                        '"enable_powershell": true in ~/.clawd/config.json. '
+                        "PowerShell execution is disabled ("
+                        '"enable_powershell": false in ~/.clawd/config.json). '
                         "Write PowerShell syntax only -- bash syntax is never "
                         "translated."
                     )
