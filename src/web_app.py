@@ -9,6 +9,7 @@ import hmac
 import json
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -1783,10 +1784,142 @@ def _run_reload_supervisor(port: int) -> int:
         return 0
 
 
+def _web_pidfile(port: int) -> Path:
+    return Path.home() / ".clawd" / f"web-{port}.pid"
+
+
+def _write_web_pidfile(port: int, workspace: str | Path) -> None:
+    """Record this web app's PID so `clawd web --kill` can find it later."""
+    try:
+        pidfile = _web_pidfile(port)
+        pidfile.parent.mkdir(parents=True, exist_ok=True)
+        pidfile.write_text(
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "port": port,
+                    "workspace": str(workspace),
+                    "started": time.time(),
+                }
+            )
+        )
+    except OSError:
+        pass  # pid tracking is best-effort; never break startup
+
+
+def _remove_web_pidfile(port: int) -> None:
+    try:
+        _web_pidfile(port).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _process_cmdline(pid: int) -> str | None:
+    """Best-effort command line of another process.
+
+    Returns None if the process is gone, "" if it is alive but the
+    command line could not be read (Windows fallback).
+    """
+    try:
+        data = Path(f"/proc/{pid}/cmdline").read_bytes()  # Linux
+        return data.replace(b"\0", b" ").decode("utf-8", "replace").strip() or None
+    except OSError:
+        pass
+    if sys.platform == "win32":
+        try:
+            out = subprocess.run(
+                ["wmic", "process", "where", f"processid={pid}",
+                 "get", "commandline", "/format:value"],
+                capture_output=True, text=True, timeout=10,
+            )
+            for line in out.stdout.splitlines():
+                if line.strip().lower().startswith("commandline="):
+                    return line.split("=", 1)[1].strip() or None
+        except (OSError, subprocess.SubprocessError):
+            pass
+        try:  # fallback: tasklist proves aliveness only
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if str(pid) in out.stdout:
+                return ""
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return None
+    try:  # macOS / other POSIX
+        out = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            capture_output=True, text=True, timeout=10,
+        )
+        return out.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _is_clawd_web_process(pid: int) -> bool:
+    """True only if pid looks like a running Clawd web app (never ourselves)."""
+    if pid == os.getpid():
+        return False
+    cmd = _process_cmdline(pid)
+    if cmd is None:
+        return False  # process gone
+    if cmd == "":
+        return True  # alive on Windows, cmdline unreadable — pidfile is our signal
+    lowered = cmd.lower()
+    return ("web_app" in lowered or "clawd" in lowered) and "web" in lowered
+
+
+def kill_web_apps(port: int | None = None) -> dict[str, list[str]]:
+    """Kill tracked Clawd web app processes.
+
+    port=None kills all tracked apps; otherwise only the app on that port.
+    Returns {"killed": [...], "not_running": [...], "skipped": [...]}.
+    """
+    result: dict[str, list[str]] = {"killed": [], "not_running": [], "skipped": []}
+    clawd_dir = Path.home() / ".clawd"
+    if not clawd_dir.is_dir():
+        return result
+    for pidfile in sorted(clawd_dir.glob("web-*.pid")):
+        try:
+            info = json.loads(pidfile.read_text())
+            pid, pid_port = int(info["pid"]), int(info["port"])
+        except (OSError, ValueError, KeyError, TypeError):
+            pidfile.unlink(missing_ok=True)
+            result["not_running"].append(f"{pidfile.name} (unreadable entry removed)")
+            continue
+        if port is not None and pid_port != port:
+            continue
+        if not _is_clawd_web_process(pid):
+            pidfile.unlink(missing_ok=True)
+            result["not_running"].append(
+                f"port {pid_port} (pid {pid} not running — entry cleaned up)"
+            )
+            continue
+        try:
+            os.kill(pid, signal.SIGTERM)
+            if sys.platform != "win32":
+                for _ in range(10):  # give it a moment to exit gracefully
+                    time.sleep(0.2)
+                    if _process_cmdline(pid) is None:
+                        break
+                else:
+                    os.kill(pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
+        if _process_cmdline(pid) is None:
+            pidfile.unlink(missing_ok=True)
+            result["killed"].append(f"port {pid_port} (pid {pid})")
+        else:
+            result["skipped"].append(f"port {pid_port} (pid {pid} would not die)")
+    return result
+
+
 def run_web_app(
     workspace: str | Path,
     port: int = 8765,
     *,
+
     reload: bool = False,
     reload_worker: bool = False,
 ) -> int:
@@ -1820,10 +1953,12 @@ def run_web_app(
     for address in _local_addresses():
         print(f"On your phone, open http://{address}:{port} on the same Wi-Fi.")
     print("Keep this terminal open. Press Ctrl+C to stop the server.")
+    _write_web_pidfile(port, state.workspace)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nStopping Clawd web app.")
     finally:
         server.server_close()
+        _remove_web_pidfile(port)
     return 0
