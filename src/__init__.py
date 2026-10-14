@@ -1,6 +1,6 @@
 """Clawd Codex - Claude Code Python Implementation."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Clawd Codex Team"
 
 from .config import load_config, get_provider_config
