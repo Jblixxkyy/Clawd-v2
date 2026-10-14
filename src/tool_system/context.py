@@ -49,7 +49,8 @@ class ToolContext:
 
     # Explicit opt-in for the PowerShell tool (Windows only). Default off;
     # populated from "enable_powershell" in ~/.clawd/config.json.
-    enable_powershell: bool = False
+    # Default ON: PowerShell is the default shell on Windows.
+    enable_powershell: bool = True
 
     # LLM provider for the current session. Set by run_agent_loop on entry;
     # tools like Subagent read it to spawn child loops. None when the
