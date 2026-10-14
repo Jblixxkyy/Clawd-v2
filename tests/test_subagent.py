@@ -124,7 +124,10 @@ class TestSubagentTool(unittest.TestCase):
             },
             provider,
         )
-        self.assertFalse(result.is_error)
+        # Brief 020: a child that makes no tool calls and never calls a
+        # terminal tool is a stall, not success.
+        self.assertTrue(result.is_error)
+        self.assertEqual(result.output["status"], "stalled")
         self.assertEqual(result.output["model"], "child-model")
         # The recorded chat call saw the overridden model.
         self.assertTrue(provider.calls)
@@ -185,7 +188,9 @@ class TestSubagentTool(unittest.TestCase):
         self.assertFalse(fetched.is_error)
         self.assertEqual(fetched.output["retrieval_status"], "success")
         task = fetched.output["task"]
-        self.assertEqual(task["status"], "done")
+        # Brief 020: the child made no tool calls and never called a
+        # terminal tool -> stall, not success.
+        self.assertEqual(task["status"], "stalled")
         self.assertIn("background report", task["response_text"])
 
     def test_no_provider_is_clean_error(self) -> None:

@@ -113,6 +113,8 @@ class CostTracker:
         self.last_turn_cost_usd: float = 0.0
         # Per-turn records: provider, model, input/output/cached tokens, cost.
         self.turns: list[dict[str, Any]] = []
+        # Per-tier spend attribution (brief 028): tier -> USD.
+        self.cost_by_tier: dict[str, float] = {}
         self._price_overrides: Optional[dict[str, tuple[float, float, float]]] = None
 
     # ------------------------------------------------------------------
@@ -235,12 +237,17 @@ class CostTracker:
         cached_tokens: Any = 0,
         cache_creation_tokens: Any = 0,
         label: Optional[str] = None,
+        tier: Optional[str] = None,
     ) -> float:
         """Record one model turn's tokens with pricing. Returns the turn cost.
 
         Also feeds ``total_units`` (so the status bar token count keeps
         working) and appends to ``events`` in the legacy ``label:units`` shape.
-        Never raises -- on any error this is a no-op returning 0.0.
+        ``tier`` attributes the spend to a model tier ("main"/"small"/"plan"/
+        "act"); when omitted it is attributed best-effort from the model
+        name via the cached tier snapshot (brief 028), falling back to
+        "unattributed". Never raises -- on any error this is a no-op
+        returning 0.0.
         """
         try:
             in_t = _as_int(input_tokens)
@@ -250,10 +257,12 @@ class CostTracker:
             cost = self.cost_for(provider, model, in_t, out_t, read_t, created_t)
             turn_index = len(self.turns) + 1
             turn_label = label or f"turn_{turn_index}_tokens"
+            tier_label = self._attribute_tier(tier, model)
             self.turns.append({
                 "label": turn_label,
                 "provider": str(provider or ""),
                 "model": str(model or ""),
+                "tier": tier_label,
                 "input_tokens": in_t,
                 "output_tokens": out_t,
                 "cached_tokens": read_t,
@@ -263,9 +272,28 @@ class CostTracker:
             self.record(turn_label, in_t + out_t)
             self.last_turn_cost_usd = cost
             self.cost_usd += cost
+            self.cost_by_tier[tier_label] = self.cost_by_tier.get(tier_label, 0.0) + cost
             return cost
         except Exception:
             return 0.0
+
+    @staticmethod
+    def _attribute_tier(tier: Optional[str], model: Any) -> str:
+        """Resolve the tier label for a turn. Never raises."""
+        if tier and str(tier).strip():
+            return str(tier).strip()
+        try:
+            from src.model_tiers import attribute_tier
+            resolved = attribute_tier(model)
+            if resolved:
+                return resolved
+        except Exception:
+            pass
+        return "unattributed"
+
+    def spend_by_tier(self) -> dict[str, float]:
+        """USD spend split by model tier (brief 028)."""
+        return dict(self.cost_by_tier)
 
     # ------------------------------------------------------------------
     # Readouts
