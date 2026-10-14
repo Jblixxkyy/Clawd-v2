@@ -102,6 +102,15 @@ class ToolContext:
     todos: list[dict[str, Any]] = field(default_factory=list)
     tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
     plan_mode: bool = False
+    # Plan-mode state-machine state (brief 016). Lives on the context
+    # (not the transcript) so the plan survives compaction cycles.
+    # plan_dir: plans directory for this session (default
+    # <workspace>/.clawd/plans); plan_file_path: current draft/approved
+    # plan file; approved_plan: validated plan text after approval,
+    # injected as the single source of truth.
+    plan_dir: str | None = None
+    plan_file_path: str | None = None
+    approved_plan: str | None = None
     worktree_root: Path | None = None
     outbox: list[dict[str, Any]] = field(default_factory=list)
     ask_user: Callable[[list[dict[str, Any]]], dict[str, str]] | None = None
@@ -137,6 +146,25 @@ class ToolContext:
     # tools like Subagent read it to spawn child loops. None when the
     # context is built without a provider (tests, standalone dispatch).
     provider: Any = None
+
+    # Live conversation object (src/agent/conversation.py Conversation).
+    # Set by the REPL before the agent loop runs; git snapshot-before-write
+    # (brief 032) reads len(conversation.messages) at snapshot time so a
+    # later restore can also rewind the conversation. None in tests /
+    # standalone dispatch.
+    conversation: Any = None
+
+    # Brief 019: post-edit verification config override. When set, replaces
+    # the "verify" section of ~/.clawd/config.json for this run:
+    # {"enabled": bool, "lint_cmd": str|None, "test_cmd": str|None,
+    #  "timeout": seconds}. None (default) reads the config file.
+    verify_config: dict[str, Any] | None = None
+
+    # Brief 029: optional recovery-judge hook for loop nudges. Called as
+    # judge(pattern, default_nudge_text) -> str | None; a non-empty return
+    # replaces the nudge the model sees on its recovery turn (the 028
+    # model-tier sidecar is the natural source). None uses the built-in nudge.
+    loop_recovery_judge: Callable[[Any, str], Optional[str]] | None = None
 
     def __post_init__(self) -> None:
         self.workspace_root = Path(self.workspace_root).resolve()

@@ -127,7 +127,10 @@ class TestLoopDetectionIntegration(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_run_agent_loop_breaks_on_repeated_tool_calls(self):
-        """A provider stuck re-issuing the same Bash call stops at 6 with the break message."""
+        """A provider stuck re-issuing the same Bash call: nudge injected at
+        the 6th identical step, exactly one recovery turn granted, then the
+        persisting pattern stops the run with a structured LoopDetected
+        report (brief 029 replaces 006's break-early behavior)."""
         conversation = Conversation()
         conversation.add_user_message("do the thing")
 
@@ -158,15 +161,32 @@ class TestLoopDetectionIntegration(unittest.TestCase):
         )
 
         self.assertIsInstance(result, AgentLoopResult)
-        self.assertEqual(
+        # Structured LoopDetected stop report, not 006's break message.
+        self.assertTrue(
+            result.response_text.startswith("[LoopDetected: signature"),
             result.response_text,
-            "[Loop detected: Bash repeated 6x with identical input \u2014 stopping. "
-            "Try a different approach.]",
         )
-        # The loop broke on the 6th identical step instead of burning max_turns.
-        self.assertEqual(mock_provider.chat.call_count, 6)
-        self.assertEqual(result.num_turns, 6)
+        self.assertIn("one recovery turn was granted", result.response_text)
+        # Nudge at the 6th identical step, one recovery turn (7th model
+        # call), then the persisting pattern stops the run.
+        self.assertEqual(mock_provider.chat.call_count, 7)
+        self.assertEqual(result.num_turns, 7)
         self.assertFalse(result.cancelled)
+        # run_log carries the pattern type for both the nudge and the stop.
+        nudges = [e for e in result.run_log if e.get("event") == "loop_nudge"]
+        self.assertEqual(len(nudges), 1)
+        self.assertEqual(nudges[0]["pattern"], "signature")
+        detected = [e for e in result.run_log if e.get("event") == "loop_detected"]
+        self.assertEqual(len(detected), 1)
+        self.assertEqual(detected[0]["pattern"], "signature")
+        # The nudge reached the conversation as a user message.
+        nudge_texts = [
+            m.content for m in conversation.messages
+            if m.role == "user" and isinstance(m.content, str)
+            and m.content.startswith("You appear stuck:")
+        ]
+        self.assertEqual(len(nudge_texts), 1)
+        self.assertIn("Try a different approach:", nudge_texts[0])
 
     def test_run_agent_loop_unaffected_by_varied_calls(self):
         """Distinct tool calls across turns never trip the detector."""

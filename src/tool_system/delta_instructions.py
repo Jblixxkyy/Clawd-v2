@@ -10,6 +10,8 @@ flow (packages/core/src/session/instruction-state.ts):
     change mid-session.
   - ``skills``: ``build_skills_section`` -- skills install mid-session and
     are discovered instantly.
+  - ``mcp``: ``build_mcp_section`` -- MCP servers connect/disconnect
+    mid-session; empty when none are connected (prompt diet).
 - Static sections (date line, merged core, conditional tool guidance, env
   block, Windows-only shell) form the cached baseline, sent every turn.
 - Turn 0 sends baseline + all dynamic sections (the full prompt).
@@ -30,7 +32,7 @@ if TYPE_CHECKING:
 
 
 # Dynamic instruction sources, in stable render order.
-_DYNAMIC_SOURCES = ("context", "skills")
+_DYNAMIC_SOURCES = ("context", "skills", "mcp")
 
 
 @dataclass
@@ -127,7 +129,7 @@ class DeltaInstructionTracker:
 
     def _build_dynamic(self) -> dict[str, str]:
         """Dynamic sections, recomputed every turn."""
-        from .system_prompt import build_skills_section
+        from .system_prompt import build_mcp_section, build_skills_section
         from ..context_system import build_context_prompt
 
         try:
@@ -141,7 +143,11 @@ class DeltaInstructionTracker:
             skills = build_skills_section(self._tool_context)
         except Exception:
             skills = ""
-        return {"context": context, "skills": skills}
+        try:
+            mcp = build_mcp_section(self._tool_context)
+        except Exception:
+            mcp = ""
+        return {"context": context, "skills": skills, "mcp": mcp}
 
     # -- public API ---------------------------------------------------------
 
