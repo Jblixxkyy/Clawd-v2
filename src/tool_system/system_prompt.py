@@ -46,7 +46,7 @@ def _build_windows_shell_section() -> str:
     return """## Shell on Windows
 
 - The Bash tool requires a bash executable and runs bash syntax only. On stock Windows it is not installed -- the Bash tool returns a clear error telling you to install Git Bash (or see docs/guide/SETUP_GUIDE.md).
-- If the PowerShell tool is enabled (opt-in: "enable_powershell": true in ~/.clawd/config.json), use it with PowerShell syntax. Never write bash syntax (&& chains, $VAR, $(...), export, backticks, forward-slash paths assumed) for the PowerShell tool -- the semantics differ silently and failures can be quiet. Match the syntax to the tool, always."""
+- The PowerShell tool is enabled by default on Windows: use it with PowerShell syntax. Never write bash syntax (&& chains, $VAR, $(...), export, backticks, forward-slash paths assumed) for the PowerShell tool -- the semantics differ silently and failures can be quiet. Match the syntax to the tool, always."""
 
 
 def build_agent_guidelines() -> str:
