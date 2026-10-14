@@ -144,7 +144,6 @@ Assistant: Hi! I'm Clawd Codex, a Python reimplementation...
 ```bash
 clawd              # Start REPL
 clawd web          # Start the browser UI for the current workspace
-clawd web --kill    # Stop all Clawd web apps started on this computer
 clawd web --reload # Development mode: restart on Clawd source edits and refresh browsers
 clawd login        # Configure API
 clawd --version    # Check version
