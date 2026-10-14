@@ -211,13 +211,15 @@ def get_default_provider() -> str:
 
 
 def powershell_opt_in() -> bool:
-    """Whether the PowerShell tool is explicitly enabled.
+    """Whether the PowerShell tool is enabled.
 
-    Opt-in config key "enable_powershell" in ~/.clawd/config.json; default
-    off. Never raises -- returns False when the config can't be read.
+    Config key "enable_powershell" in ~/.clawd/config.json; default ON
+    (PowerShell is the default shell on Windows, where most users are).
+    Set "enable_powershell": false to opt out. Never raises -- returns
+    True when the config can't be read.
     """
     try:
         config = load_config()
     except Exception:
-        return False
-    return bool(config.get("enable_powershell", False))
+        return True
+    return bool(config.get("enable_powershell", True))
